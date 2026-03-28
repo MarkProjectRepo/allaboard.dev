@@ -94,6 +94,7 @@ Migration files go in `api/migrations/` and are named `YYYYMMDDHHMMSS_descriptio
 6. `20260328000001_add_auth_fields_to_users` — adds `email`, `profile_picture_url` to users
 7. `20260328000002_create_oauth_accounts` — Google OAuth identity → user link
 8. `20260328000003_create_auth_sessions` — web login sessions (HttpOnly cookie)
+9. `20260328000004_add_picture_to_oauth_accounts` — adds `profile_picture_url` to oauth_accounts (available before users row exists)
 
 ---
 
@@ -400,13 +401,21 @@ The Neon Vercel integration sets `DATABASE_URL` and `DATABASE_URL_UNPOOLED` auto
 
 There is no separate API server deployment. All routes are handled by Next.js on Vercel.
 
-### Google OAuth environment variables (when implemented)
-| Variable | Where |
-|----------|-------|
-| `GOOGLE_CLIENT_ID` | API server |
-| `GOOGLE_CLIENT_SECRET` | API server |
-| `GOOGLE_CALLBACK_URL` | API server (`https://<api-host>/auth/callback`) |
-| `SESSION_SECRET` | API server (for signing session tokens) |
+### Google OAuth environment variables
+| Variable | Where | Notes |
+|----------|-------|-------|
+| `GOOGLE_CLIENT_ID` | `.env` (root) | Auto-loaded by Next.js |
+| `GOOGLE_CLIENT_SECRET` | `.env` (root) | Auto-loaded by Next.js |
+
+The callback URL is derived from the incoming request's `origin` — no env var needed. It resolves to `http://localhost:3000/api/auth/callback` locally and `https://www.allaboard.dev/api/auth/callback` in production. Both must be registered in Google Cloud Console.
+
+### How Next.js loads environment variables
+Next.js automatically loads these files (in priority order, highest last):
+1. `.env` — committed defaults, loaded everywhere
+2. `.env.local` — local overrides, gitignored, loaded everywhere
+3. `.env.production` / `.env.development` — environment-specific
+
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` live in `.env` (gitignored via `.env*`). Only `NEXT_PUBLIC_` prefixed vars are sent to the browser — all others are server-only.
 
 ---
 
