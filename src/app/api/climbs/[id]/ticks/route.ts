@@ -48,7 +48,6 @@ export async function POST(
     }
 
     const resolvedUrl = instagramUrl?.trim() || null;
-    const thumbnail   = resolvedUrl ? await fetchInstagramThumbnail(resolvedUrl) : null;
 
     const tickDate = date ?? new Date().toISOString().slice(0, 10);
     const now = new Date();
@@ -62,7 +61,6 @@ export async function POST(
         rating,
         comment:              comment?.trim() || null,
         instagram_url:        resolvedUrl,
-        instagram_thumbnail:  thumbnail,
         sent:                 sent ?? true,
         created_at:           now,
         updated_at:           now,
@@ -74,7 +72,6 @@ export async function POST(
         rating,
         comment:              comment?.trim() || null,
         instagram_url:        resolvedUrl,
-        instagram_thumbnail:  thumbnail,
         sent:                 sent ?? true,
         updated_at:           now,
       });
@@ -100,21 +97,6 @@ export async function POST(
   }
 }
 
-async function fetchInstagramThumbnail(url: string): Promise<string | null> {
-  const token = process.env.META_APP_ACCESS_TOKEN;
-  if (!token) return null;
-  try {
-    const oembedUrl =
-      `https://graph.facebook.com/v19.0/instagram_oembed` +
-      `?url=${encodeURIComponent(url)}&fields=thumbnail_url&access_token=${encodeURIComponent(token)}`;
-    const res = await fetch(oembedUrl, { signal: AbortSignal.timeout(4000) });
-    if (!res.ok) return null;
-    const data = await res.json() as { thumbnail_url?: string };
-    return data.thumbnail_url ?? null;
-  } catch {
-    return null;
-  }
-}
 
 function toTick(row: Record<string, unknown>) {
   return {

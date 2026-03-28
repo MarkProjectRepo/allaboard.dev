@@ -19,8 +19,8 @@ function toClimb(row: Record<string, unknown>, videos: Record<string, unknown>[]
     sends:       row.sends ?? 0,
     createdAt:   row.created_at,
     betaVideos:  videos.map((v) => ({
-      url:       v.url,
-      thumbnail: v.thumbnail ?? undefined,
+      url:         v.url,
+      submittedBy: v.handle ?? v.user_id,
     })),
   };
 }
@@ -38,10 +38,11 @@ export async function GET(
       .first();
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const videos = await db("ticks")
-      .where({ climb_id: id })
-      .whereNotNull("instagram_url")
-      .select("instagram_url as url", "instagram_thumbnail as thumbnail")
-      .orderBy("created_at", "asc");
+      .join("users", "ticks.user_id", "users.id")
+      .where({ "ticks.climb_id": id })
+      .whereNotNull("ticks.instagram_url")
+      .select("ticks.instagram_url as url", "users.handle")
+      .orderBy("ticks.created_at", "asc");
     return NextResponse.json(toClimb(row, videos));
   } catch (err) {
     console.error(err);

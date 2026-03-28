@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
       .orderBy("t.created_at", "desc")
       .limit(50)
       .select(
-        "t.id", "t.date", "t.sent", "t.rating", "t.comment", "t.suggested_grade",
+        "t.id", "t.date", "t.sent", "t.rating", "t.comment", "t.suggested_grade", "t.instagram_url",
         "c.id as climb_id", "c.name as climb_name", "c.grade",
         "c.board_id", "b.name as board_name",
         "c.angle", "c.description", "c.author", "c.setter", "c.sends",
@@ -32,10 +32,11 @@ export async function GET(req: NextRequest) {
     const climbIds = [...new Set(rows.map((r) => r.climb_id))];
     const videos = climbIds.length
       ? await db("ticks")
-          .whereIn("climb_id", climbIds)
-          .whereNotNull("instagram_url")
-          .select("climb_id", "instagram_url as url", "instagram_thumbnail as thumbnail")
-          .orderBy("created_at", "asc")
+          .join("users", "ticks.user_id", "users.id")
+          .whereIn("ticks.climb_id", climbIds)
+          .whereNotNull("ticks.instagram_url")
+          .select("ticks.climb_id", "ticks.instagram_url as url", "users.handle")
+          .orderBy("ticks.created_at", "asc")
       : [];
     const videosByClimb: Record<string, typeof videos> = {};
     for (const v of videos) {
@@ -50,6 +51,7 @@ export async function GET(req: NextRequest) {
       rating:         r.rating,
       comment:        r.comment ?? undefined,
       suggestedGrade: r.suggested_grade ?? undefined,
+      instagramUrl:   r.instagram_url ?? undefined,
       user: {
         id: r.user_id, handle: r.handle, displayName: r.display_name,
         avatarColor: r.avatar_color, profilePictureUrl: r.profile_picture_url ?? undefined,
@@ -69,7 +71,7 @@ export async function GET(req: NextRequest) {
         starRating: r.star_rating != null ? Number(r.star_rating) : undefined,
         createdAt: r.climb_created_at,
         betaVideos: (videosByClimb[r.climb_id] ?? []).map((v) => ({
-          url: v.url, thumbnail: v.thumbnail ?? undefined,
+          url: v.url, submittedBy: v.handle,
         })),
       },
     }));

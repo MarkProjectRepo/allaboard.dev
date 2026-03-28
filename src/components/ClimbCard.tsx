@@ -1,5 +1,6 @@
-import Link from "next/link";
-import Image from "next/image";
+"use client";
+
+import { useRouter } from "next/navigation";
 import { Climb } from "@/lib/types";
 import GradeBadge from "./GradeBadge";
 import StarRating from "./StarRating";
@@ -15,10 +16,12 @@ interface ClimbCardProps {
 }
 
 export default function ClimbCard({ climb, canTick, onTick }: ClimbCardProps) {
+  const router = useRouter();
   return (
-    <div className="relative">
-      <Link href={`/climbs/${climb.id}`}>
-        <div className="bg-stone-800 border border-stone-700 rounded-xl p-4 hover:border-stone-500 transition-colors cursor-pointer">
+    <div
+      className="bg-stone-800 border border-stone-700 rounded-xl p-4 hover:border-stone-500 transition-colors cursor-pointer"
+      onClick={() => router.push(`/climbs/${climb.id}`)}
+    >
 
           {/* Top row: grade + metadata pills + sends */}
           <div className="flex items-center justify-between gap-3">
@@ -55,41 +58,6 @@ export default function ClimbCard({ climb, canTick, onTick }: ClimbCardProps) {
             </p>
           )}
 
-          {/* Beta video thumbnails */}
-          {climb.betaVideos && climb.betaVideos.length > 0 && (
-            <div className="flex gap-2 mt-3">
-              {climb.betaVideos.map((video, i) => (
-                <div
-                  key={i}
-                  className="relative w-16 h-16 rounded-lg overflow-hidden bg-stone-700 shrink-0 ring-1 ring-stone-600"
-                >
-                  {video.thumbnail ? (
-                    <Image
-                      src={video.thumbnail}
-                      alt="Instagram beta"
-                      fill
-                      className="object-cover"
-                      sizes="64px"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center">
-                      <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d={INSTAGRAM_PATH} />
-                      </svg>
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                    <div className="w-5 h-5 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                      <svg className="w-2.5 h-2.5 text-white translate-x-px" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Footer */}
           <div className="flex items-center justify-between mt-3">
             <div className="flex items-center gap-4 text-xs text-stone-500">
@@ -114,8 +82,31 @@ export default function ClimbCard({ climb, canTick, onTick }: ClimbCardProps) {
             )}
           </div>
 
+      {/* Beta video links */}
+      {climb.betaVideos && climb.betaVideos.length > 0 && (
+        <div className="flex gap-2 mt-3 flex-wrap">
+          {climb.betaVideos.map((video, i) => (
+            <a
+              key={i}
+              href={video.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex flex-col items-center gap-1 group"
+            >
+              <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center ring-1 ring-stone-600 group-hover:ring-orange-400 transition-all">
+                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d={INSTAGRAM_PATH} />
+                </svg>
+              </div>
+              <span className="text-stone-500 text-xs group-hover:text-stone-300 transition-colors">
+                @{video.submittedBy}
+              </span>
+            </a>
+          ))}
         </div>
-      </Link>
+      )}
+
     </div>
   );
 }

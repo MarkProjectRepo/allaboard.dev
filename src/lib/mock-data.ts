@@ -17,8 +17,8 @@ export const mockClimbs: Climb[] = [
     createdAt: "2026-03-12T14:32:00Z",
     sends: 3,
     betaVideos: [
-      { url: "https://www.instagram.com/reel/abc123/", thumbnail: "https://picsum.photos/seed/crimsona/320/320" },
-      { url: "https://www.instagram.com/reel/abc456/", thumbnail: "https://picsum.photos/seed/crimsonb/320/320" },
+      { url: "https://www.instagram.com/reel/abc123/", submittedBy: "alex_sends" },
+      { url: "https://www.instagram.com/reel/abc456/", submittedBy: "beth_climbs" },
     ],
   },
   {
@@ -35,9 +35,9 @@ export const mockClimbs: Climb[] = [
     createdAt: "2026-03-11T09:15:00Z",
     sends: 8,
     betaVideos: [
-      { url: "https://www.instagram.com/reel/moon1/", thumbnail: "https://picsum.photos/seed/moonpiga/320/320" },
-      { url: "https://www.instagram.com/reel/moon2/", thumbnail: "https://picsum.photos/seed/moonpigb/320/320" },
-      { url: "https://www.instagram.com/reel/moon3/", thumbnail: "https://picsum.photos/seed/moonpigc/320/320" },
+      { url: "https://www.instagram.com/reel/moon1/", submittedBy: "beth_climbs" },
+      { url: "https://www.instagram.com/reel/moon2/", submittedBy: "carlos_v" },
+      { url: "https://www.instagram.com/reel/moon3/", submittedBy: "eli_boulders" },
     ],
   },
   {
@@ -54,7 +54,7 @@ export const mockClimbs: Climb[] = [
     createdAt: "2026-03-10T18:00:00Z",
     sends: 14,
     betaVideos: [
-      { url: "https://www.instagram.com/reel/foot1/", thumbnail: "https://picsum.photos/seed/footworka/320/320" },
+      { url: "https://www.instagram.com/reel/foot1/", submittedBy: "carlos_v" },
     ],
   },
   {
@@ -71,7 +71,7 @@ export const mockClimbs: Climb[] = [
     createdAt: "2026-03-09T20:45:00Z",
     sends: 1,
     betaVideos: [
-      { url: "https://www.instagram.com/reel/under1/", thumbnail: "https://picsum.photos/seed/underclinga/320/320" },
+      { url: "https://www.instagram.com/reel/under1/", submittedBy: "diana_proj" },
     ],
   },
   {
@@ -88,8 +88,8 @@ export const mockClimbs: Climb[] = [
     createdAt: "2026-03-08T11:30:00Z",
     sends: 4,
     betaVideos: [
-      { url: "https://www.instagram.com/reel/slop1/", thumbnail: "https://picsum.photos/seed/slopya/320/320" },
-      { url: "https://www.instagram.com/reel/slop2/", thumbnail: "https://picsum.photos/seed/slopyb/320/320" },
+      { url: "https://www.instagram.com/reel/slop1/", submittedBy: "eli_boulders" },
+      { url: "https://www.instagram.com/reel/slop2/", submittedBy: "alex_sends" },
     ],
   },
   {
@@ -106,8 +106,8 @@ export const mockClimbs: Climb[] = [
     createdAt: "2026-03-07T17:00:00Z",
     sends: 2,
     betaVideos: [
-      { url: "https://www.instagram.com/reel/gast1/", thumbnail: "https://picsum.photos/seed/gastona/320/320" },
-      { url: "https://www.instagram.com/reel/gast2/", thumbnail: "https://picsum.photos/seed/gastonb/320/320" },
+      { url: "https://www.instagram.com/reel/gast1/", submittedBy: "beth_climbs" },
+      { url: "https://www.instagram.com/reel/gast2/", submittedBy: "diana_proj" },
     ],
   },
 ];

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import { Climb } from "@/lib/types";
 import { getClimbById } from "@/lib/db";
 import { useAuth } from "@/lib/auth-context";
@@ -63,17 +62,29 @@ export default function ClimbPage() {
           <Link href="/climbs" className="text-stone-400 hover:text-white text-sm transition-colors inline-flex items-center gap-1">
             ← Back to climbs
           </Link>
-          {isOwner && (
-            <Link
-              href={`/climbs/${id}/edit`}
-              className="text-sm text-stone-400 hover:text-white border border-stone-700 hover:border-stone-500 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              Edit climb
-            </Link>
-          )}
+          <div className="flex items-center gap-2">
+            {user && (
+              <button
+                onClick={() => setTickModal(true)}
+                className="text-sm text-white bg-orange-500 hover:bg-orange-400 px-3 py-1.5 rounded-lg transition-colors font-medium"
+              >
+                Tick this climb
+              </button>
+            )}
+            {isOwner && (
+              <Link
+                href={`/climbs/${id}/edit`}
+                className="text-sm text-stone-400 hover:text-white border border-stone-700 hover:border-stone-500 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Edit climb
+              </Link>
+            )}
+          </div>
         </div>
 
         <div className="mt-2">
+          <h1 className="text-3xl font-bold text-black mb-3">{climb.name}</h1>
+
           {/* Grade + metadata */}
           <div className="flex items-center gap-2 flex-wrap mb-3">
             <GradeBadge grade={climb.grade} size="md" />
@@ -97,8 +108,6 @@ export default function ClimbPage() {
               </span>
             </div>
           </div>
-
-          <h1 className="text-3xl font-bold text-white">{climb.name}</h1>
           <div className="flex items-center gap-3 mt-2 text-sm text-stone-400">
             <span>submitted by @{climb.author}</span>
             {climb.setter && (
@@ -115,55 +124,29 @@ export default function ClimbPage() {
             <p className="mt-5 text-stone-300 leading-relaxed">{climb.description}</p>
           )}
 
-          {/* Tick button */}
-          {user && (
-            <div className="mt-6">
-              <button
-                onClick={() => setTickModal(true)}
-                className="bg-orange-500 hover:bg-orange-400 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors text-sm"
-              >
-                Tick this climb
-              </button>
-            </div>
-          )}
-
           {/* Beta videos */}
           {climb.betaVideos && climb.betaVideos.length > 0 && (
             <div className="mt-8">
               <h2 className="text-white font-semibold mb-3">
                 Beta ({climb.betaVideos.length} {climb.betaVideos.length === 1 ? "video" : "videos"})
               </h2>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="flex flex-wrap gap-4">
                 {climb.betaVideos.map((video, i) => (
                   <a
                     key={i}
                     href={video.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="relative aspect-square rounded-xl overflow-hidden bg-stone-700 block ring-1 ring-stone-600 hover:ring-orange-500 transition-all"
+                    className="flex flex-col items-center gap-2 group"
                   >
-                    {video.thumbnail ? (
-                      <Image
-                        src={video.thumbnail}
-                        alt="Instagram beta video"
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 640px) 33vw, 200px"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center">
-                        <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d={INSTAGRAM_PATH} />
-                        </svg>
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
-                      <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
-                        <svg className="w-5 h-5 text-white translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      </div>
+                    <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center ring-1 ring-stone-600 group-hover:ring-orange-400 transition-all">
+                      <svg className="w-9 h-9 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d={INSTAGRAM_PATH} />
+                      </svg>
                     </div>
+                    <span className="text-stone-400 text-xs group-hover:text-white transition-colors">
+                      @{video.submittedBy}
+                    </span>
                   </a>
                 ))}
               </div>

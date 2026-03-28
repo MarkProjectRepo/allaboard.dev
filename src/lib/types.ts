@@ -10,7 +10,7 @@ export interface Board {
 
 export interface BetaVideo {
   url: string;
-  thumbnail?: string; // may be absent if instagram oEmbed unavailable
+  submittedBy: string; // handle of the user who ticked with this video
 }
 
 export interface Tick {
@@ -120,4 +120,5 @@ export interface FeedActivity {
   rating: number;
   comment?: string;
   suggestedGrade?: Grade;
+  instagramUrl?: string;
 }

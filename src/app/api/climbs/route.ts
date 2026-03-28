@@ -21,8 +21,8 @@ function toClimb(row: Record<string, unknown>, videos: Record<string, unknown>[]
     sends:       row.sends ?? 0,
     createdAt:   row.created_at,
     betaVideos:  videos.map((v) => ({
-      url:       v.url,
-      thumbnail: v.thumbnail ?? undefined,
+      url:         v.url,
+      submittedBy: v.handle ?? v.user_id,
     })),
   };
 }
@@ -68,13 +68,13 @@ export async function GET(req: NextRequest) {
     if (hasMore) rows.pop();
 
     const ids     = rows.map((r) => r.id);
-    // Beta videos come from ticks that have an instagram URL
     const videos  = ids.length
       ? await db("ticks")
-          .whereIn("climb_id", ids)
-          .whereNotNull("instagram_url")
-          .select("climb_id", "instagram_url as url", "instagram_thumbnail as thumbnail")
-          .orderBy("created_at", "asc")
+          .join("users", "ticks.user_id", "users.id")
+          .whereIn("ticks.climb_id", ids)
+          .whereNotNull("ticks.instagram_url")
+          .select("ticks.climb_id", "ticks.instagram_url as url", "users.handle")
+          .orderBy("ticks.created_at", "asc")
       : [];
 
     const byClimb: Record<string, Record<string, unknown>[]> = {};
