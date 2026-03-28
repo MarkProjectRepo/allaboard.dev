@@ -33,10 +33,11 @@ export async function POST(
     const climb = await db("climbs").where({ id }).first();
     if (!climb) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const { date, sent, suggestedGrade, rating, comment, instagramUrl } =
+    const { date, sent, attempts, suggestedGrade, rating, comment, instagramUrl } =
       await req.json() as {
         date?: string;
         sent?: boolean;
+        attempts?: number;
         suggestedGrade?: string;
         rating: number;
         comment?: string;
@@ -61,6 +62,7 @@ export async function POST(
         rating,
         comment:              comment?.trim() || null,
         instagram_url:        resolvedUrl,
+        attempts:             attempts ?? null,
         sent:                 sent ?? true,
         created_at:           now,
         updated_at:           now,
@@ -72,6 +74,7 @@ export async function POST(
         rating,
         comment:              comment?.trim() || null,
         instagram_url:        resolvedUrl,
+        attempts:             attempts ?? null,
         sent:                 sent ?? true,
         updated_at:           now,
       });
@@ -108,6 +111,7 @@ function toTick(row: Record<string, unknown>) {
     rating:         row.rating,
     comment:        row.comment ?? undefined,
     instagramUrl:   row.instagram_url ?? undefined,
+    attempts:       row.attempts ?? undefined,
     sent:           row.sent,
     createdAt:      row.created_at,
   };

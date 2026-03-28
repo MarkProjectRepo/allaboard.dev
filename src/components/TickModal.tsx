@@ -17,6 +17,7 @@ export default function TickModal({ climbId, climbName, onClose, onSuccess }: Ti
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate]                   = useState(today);
   const [sent, setSent]                   = useState(true);
+  const [attempts, setAttempts]           = useState("");
   const [rating, setRating]               = useState(0);
   const [suggestedGrade, setSuggestedGrade] = useState<Grade | "">("");
   const [comment, setComment]             = useState("");
@@ -34,6 +35,7 @@ export default function TickModal({ climbId, climbName, onClose, onSuccess }: Ti
       await tickClimb(climbId, {
         date,
         sent,
+        attempts: attempts ? Number(attempts) : undefined,
         suggestedGrade: suggestedGrade || undefined,
         rating,
         comment: comment.trim() || undefined,
@@ -104,6 +106,22 @@ export default function TickModal({ climbId, climbName, onClose, onSuccess }: Ti
                 No — Working
               </button>
             </div>
+          </div>
+
+          {/* Attempts */}
+          <div>
+            <label className="block text-sm font-medium text-stone-300 mb-1.5">
+              Attempts
+              <span className="text-stone-500 font-normal ml-1">(optional — leave blank for &ldquo;a bunch&rdquo;)</span>
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={attempts}
+              onChange={(e) => setAttempts(e.target.value)}
+              placeholder="e.g. 5"
+              className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2.5 text-white placeholder:text-stone-500 focus:outline-none focus:border-orange-500 transition-colors"
+            />
           </div>
 
           {/* Star rating */}

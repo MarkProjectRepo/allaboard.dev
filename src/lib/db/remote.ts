@@ -75,7 +75,7 @@ export async function updateClimb(
 
 export async function tickClimb(
   climbId: string,
-  data: { date: string; sent: boolean; suggestedGrade?: string; rating: number; comment?: string; instagramUrl?: string },
+  data: { date: string; sent: boolean; attempts?: number; suggestedGrade?: string; rating: number; comment?: string; instagramUrl?: string },
 ): Promise<Tick> {
   return api<Tick>(`/climbs/${climbId}/ticks`, { method: "POST", body: JSON.stringify(data) });
 }

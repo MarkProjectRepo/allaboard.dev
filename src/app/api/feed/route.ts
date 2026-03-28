@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
       .orderBy("t.created_at", "desc")
       .limit(50)
       .select(
-        "t.id", "t.date", "t.sent", "t.rating", "t.comment", "t.suggested_grade", "t.instagram_url",
+        "t.id", "t.date", "t.sent", "t.rating", "t.comment", "t.suggested_grade", "t.instagram_url", "t.attempts",
         "c.id as climb_id", "c.name as climb_name", "c.grade",
         "c.board_id", "b.name as board_name",
         "c.angle", "c.description", "c.author", "c.setter", "c.sends",
@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
       comment:        r.comment ?? undefined,
       suggestedGrade: r.suggested_grade ?? undefined,
       instagramUrl:   r.instagram_url ?? undefined,
+      attempts:       r.attempts ?? undefined,
       user: {
         id: r.user_id, handle: r.handle, displayName: r.display_name,
         avatarColor: r.avatar_color, profilePictureUrl: r.profile_picture_url ?? undefined,

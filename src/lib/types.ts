@@ -22,6 +22,7 @@ export interface Tick {
   comment?: string;
   instagramUrl?: string;
   sent: boolean;
+  attempts?: number;   // null/undefined = "a bunch"
   date: string;        // date the tick happened (YYYY-MM-DD)
   createdAt: string;
 }
@@ -38,6 +39,7 @@ export interface UserTick {
   comment?: string;
   instagramUrl?: string;
   sent: boolean;
+  attempts?: number;
   date: string;
   createdAt: string;
 }
@@ -118,6 +120,7 @@ export interface FeedActivity {
   date: string;        // date of the tick
   sent: boolean;
   rating: number;
+  attempts?: number;   // null/undefined = "a bunch"
   comment?: string;
   suggestedGrade?: Grade;
   instagramUrl?: string;
