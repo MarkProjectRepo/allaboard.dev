@@ -12,6 +12,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -84,6 +85,17 @@ export async function tickClimb(
 
 export async function getUserTicks(userId: string): Promise<UserTick[]> {
   return api<UserTick[]>(`/ticks?userId=${encodeURIComponent(userId)}`);
+}
+
+export async function updateTick(
+  tickId: string,
+  data: { date: string; sent: boolean; attempts?: number; suggestedGrade?: string; rating: number; comment?: string; instagramUrl?: string },
+): Promise<void> {
+  await api<void>(`/ticks/${encodeURIComponent(tickId)}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function deleteTick(tickId: string): Promise<void> {
+  await api<void>(`/ticks/${encodeURIComponent(tickId)}`, { method: "DELETE" });
 }
 
 export async function getClimbTicks(climbId: string): Promise<Tick[]> {

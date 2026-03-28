@@ -22,6 +22,7 @@ export default function ClimbsPage() {
   const [hasMore, setHasMore]     = useState(false);
   const offsetRef = useRef(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const defaultApplied = useRef(false);
 
   // Filter state
   const [query, setQuery]       = useState("");
@@ -41,13 +42,21 @@ export default function ClimbsPage() {
   const boardRef = useRef<HTMLDivElement>(null);
   const angleRef = useRef<HTMLDivElement>(null);
 
-  // Load boards once
+  // Load boards once; apply user's home board as default filter on first load
   useEffect(() => {
     fetch("/api/boards")
       .then((r) => r.json())
-      .then(setBoards)
+      .then((loaded: Board[]) => {
+        setBoards(loaded);
+        if (!defaultApplied.current && user?.homeBoard) {
+          const match = loaded.find((b) => b.name === user.homeBoard);
+          if (match) setBoardId(match.id);
+          defaultApplied.current = true;
+        }
+      })
       .catch(() => {});
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   function buildFilters(offset: number): ClimbFilters {
     const f: ClimbFilters = { limit: PAGE_SIZE, offset };

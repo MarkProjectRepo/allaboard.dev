@@ -51,7 +51,7 @@ export default function StatsPage() {
       {/* Grade Pyramid */}
       {stats.gradePyramid.length > 0 && (
         <section className="mb-10">
-          <h2 className="text-white font-semibold text-lg mb-4">Grade Pyramid</h2>
+          <h2 className="text-orange-400 font-semibold text-lg mb-4">Grade Pyramid</h2>
           <div className="bg-stone-800 border border-stone-700 rounded-xl p-5">
             <GradePyramid rows={stats.gradePyramid} />
           </div>
@@ -60,7 +60,7 @@ export default function StatsPage() {
 
       {/* Session Frequency */}
       <section className="mb-10">
-        <h2 className="text-white font-semibold text-lg mb-4">Session Frequency (last 12 weeks)</h2>
+        <h2 className="text-orange-400 font-semibold text-lg mb-4">Session Frequency (last 12 weeks)</h2>
         <div className="bg-stone-800 border border-stone-700 rounded-xl p-5">
           <div className="flex items-end gap-1.5" style={{ height: "96px" }}>
             {stats.sessionFrequency.map(({ weekLabel, sessionCount }) => {
@@ -88,7 +88,7 @@ export default function StatsPage() {
       {/* Progress Over Time */}
       {stats.progressOverTime.length > 0 && (
         <section className="mb-10">
-          <h2 className="text-white font-semibold text-lg mb-4">Progress Over Time</h2>
+          <h2 className="text-orange-400 font-semibold text-lg mb-4">Progress Over Time</h2>
           <div className="bg-stone-800 border border-stone-700 rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead>
@@ -115,7 +115,7 @@ export default function StatsPage() {
       {/* Attempts vs Sends */}
       {stats.attemptsVsSends.length > 0 && (
         <section className="mb-10">
-          <h2 className="text-white font-semibold text-lg mb-4">Attempts vs Sends</h2>
+          <h2 className="text-orange-400 font-semibold text-lg mb-4">Attempts vs Sends</h2>
           <div className="bg-stone-800 border border-stone-700 rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead>

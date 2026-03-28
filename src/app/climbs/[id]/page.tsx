@@ -127,7 +127,7 @@ export default function ClimbPage() {
           {/* Beta videos */}
           {climb.betaVideos && climb.betaVideos.length > 0 && (
             <div className="mt-8">
-              <h2 className="text-white font-semibold mb-3">
+              <h2 className="text-orange-400 font-semibold mb-3">
                 Beta ({climb.betaVideos.length} {climb.betaVideos.length === 1 ? "video" : "videos"})
               </h2>
               <div className="flex flex-wrap gap-4">

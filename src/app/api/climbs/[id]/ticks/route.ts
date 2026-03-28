@@ -50,34 +50,32 @@ export async function POST(
 
     const resolvedUrl = instagramUrl?.trim() || null;
 
-    const tickDate = date ?? new Date().toISOString().slice(0, 10);
     const now = new Date();
-    await db("ticks")
-      .insert({
-        id:                   uuidv4(),
-        climb_id:             id,
-        user_id:              session.userId,
-        date:                 tickDate,
-        suggested_grade:      suggestedGrade ?? null,
-        rating,
-        comment:              comment?.trim() || null,
-        instagram_url:        resolvedUrl,
-        attempts:             attempts ?? null,
-        sent:                 sent ?? true,
-        created_at:           now,
-        updated_at:           now,
-      })
-      .onConflict(["climb_id", "user_id"])
-      .merge({
-        date:                 tickDate,
-        suggested_grade:      suggestedGrade ?? null,
-        rating,
-        comment:              comment?.trim() || null,
-        instagram_url:        resolvedUrl,
-        attempts:             attempts ?? null,
-        sent:                 sent ?? true,
-        updated_at:           now,
-      });
+    // Combine the user-selected date with the current time of day so the
+    // timestamp is precise to the second while the user only picks a date.
+    let tickTimestamp: Date;
+    if (date) {
+      const [y, m, d] = date.split("-").map(Number);
+      tickTimestamp = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    } else {
+      tickTimestamp = now;
+    }
+
+    const tickId = uuidv4();
+    await db("ticks").insert({
+      id:              tickId,
+      climb_id:        id,
+      user_id:         session.userId,
+      date:            tickTimestamp,
+      suggested_grade: suggestedGrade ?? null,
+      rating,
+      comment:         comment?.trim() || null,
+      instagram_url:   resolvedUrl,
+      attempts:        attempts ?? null,
+      sent:            sent ?? true,
+      created_at:      now,
+      updated_at:      now,
+    });
 
     // Recalculate aggregates on the climb
     const [ratingResult] = await db("ticks")
@@ -92,7 +90,7 @@ export async function POST(
       sends:       Number(sendsResult?.count ?? 0),
     });
 
-    const tick = await db("ticks").where({ climb_id: id, user_id: session.userId }).first();
+    const tick = await db("ticks").where({ id: tickId }).first();
     return NextResponse.json(toTick(tick), { status: 201 });
   } catch (err) {
     console.error(err);

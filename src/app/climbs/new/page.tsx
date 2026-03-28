@@ -13,6 +13,7 @@ export default function NewClimbPage() {
   const { user, loading } = useAuth();
 
   const [boards, setBoards]           = useState<Board[]>([]);
+  const [boardId, setBoardId]         = useState<string>("");
   const [submitting, setSubmitting]   = useState(false);
   const [error, setError]             = useState("");
 
@@ -21,13 +22,20 @@ export default function NewClimbPage() {
     if (!loading && !user) router.replace("/");
   }, [user, loading, router]);
 
-  // Load boards
+  // Load boards and pre-select user's home board
   useEffect(() => {
     fetch("/api/boards")
       .then((r) => r.json())
-      .then(setBoards)
+      .then((loaded: Board[]) => {
+        setBoards(loaded);
+        if (user?.homeBoard) {
+          const match = loaded.find((b) => b.name === user.homeBoard);
+          if (match) setBoardId(match.id);
+        }
+      })
       .catch(() => {});
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -40,7 +48,7 @@ export default function NewClimbPage() {
       const climb = await createClimb({
         name:        (fd.get("name") as string).trim(),
         grade:       fd.get("grade") as Grade,
-        boardId:     fd.get("boardId") as string,
+        boardId,
         angle:       fd.get("angle") ? Number(fd.get("angle")) : 40,
         description: (fd.get("description") as string).trim(),
         setter:      (fd.get("setter") as string).trim() || undefined,
@@ -133,12 +141,18 @@ export default function NewClimbPage() {
             {boards.map((board) => (
               <label
                 key={board.id}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg border border-stone-700 bg-stone-900 hover:border-stone-500 cursor-pointer transition-colors has-[:checked]:border-orange-500 has-[:checked]:bg-stone-800"
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-colors ${
+                  boardId === board.id
+                    ? "border-orange-500 bg-stone-800"
+                    : "border-stone-700 bg-stone-900 hover:border-stone-500"
+                }`}
               >
                 <input
                   type="radio"
                   name="boardId"
                   value={board.id}
+                  checked={boardId === board.id}
+                  onChange={() => setBoardId(board.id)}
                   required
                   className="accent-orange-500"
                 />

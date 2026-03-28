@@ -5,14 +5,14 @@ export default function PrivacyPolicy() {
       <p className="text-stone-500 text-sm mb-10">Last updated: March 28, 2026</p>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-white mb-3">1. Overview</h2>
+        <h2 className="text-xl font-semibold text-orange-400 mb-3">1. Overview</h2>
         <p className="text-stone-300 leading-relaxed">
           Allaboard (&ldquo;we&rdquo;, &ldquo;us&rdquo;, or &ldquo;our&rdquo;) is a climbing community platform that allows users to log climbs, share beta, and track their progress. This Privacy Policy explains what information we collect, how we use it, and your rights regarding that information. The data controller for personal data collected through this Service is Benjamin Coe, reachable at bencoe@gmail.com.
         </p>
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-white mb-3">2. Information We Collect</h2>
+        <h2 className="text-xl font-semibold text-orange-400 mb-3">2. Information We Collect</h2>
         <p className="text-stone-300 leading-relaxed mb-3">
           When you sign in with Google, we receive your name, email address, and profile picture from Google solely to create and identify your account. We do not collect, store, or share any data from Facebook or Meta.
         </p>
@@ -31,7 +31,7 @@ export default function PrivacyPolicy() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-white mb-3">3. Lawful Basis for Processing</h2>
+        <h2 className="text-xl font-semibold text-orange-400 mb-3">3. Lawful Basis for Processing</h2>
         <p className="text-stone-300 leading-relaxed mb-3">
           We process your personal data on the following legal grounds:
         </p>
@@ -43,14 +43,14 @@ export default function PrivacyPolicy() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-white mb-3">4. Facebook / Meta Data</h2>
+        <h2 className="text-xl font-semibold text-orange-400 mb-3">4. Facebook / Meta Data</h2>
         <p className="text-stone-300 leading-relaxed">
           Allaboard uses the Meta oEmbed API solely to fetch preview thumbnails for Instagram video links that users voluntarily provide. We do not collect, store, or process any personal data from Facebook or Meta. No Facebook login is offered or required. No Facebook user data is retained on our servers.
         </p>
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-white mb-3">5. How We Use Your Information</h2>
+        <h2 className="text-xl font-semibold text-orange-400 mb-3">5. How We Use Your Information</h2>
         <ul className="list-disc list-inside text-stone-300 space-y-1 leading-relaxed">
           <li>To create and manage your account</li>
           <li>To display your climbing activity to other users of the platform</li>
@@ -61,7 +61,7 @@ export default function PrivacyPolicy() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-white mb-3">6. Data Sharing</h2>
+        <h2 className="text-xl font-semibold text-orange-400 mb-3">6. Data Sharing</h2>
         <p className="text-stone-300 leading-relaxed mb-3">
           We do not sell, rent, trade, or share your personal information with third parties for marketing or commercial purposes. We will never sell your data.
         </p>
@@ -82,14 +82,14 @@ export default function PrivacyPolicy() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-white mb-3">7. Data Retention</h2>
+        <h2 className="text-xl font-semibold text-orange-400 mb-3">7. Data Retention</h2>
         <p className="text-stone-300 leading-relaxed">
           We retain your personal data for as long as your account is active. Account and profile data is retained until you request deletion. Climbing activity data (ticks, climbs) is retained until you request deletion or account closure. Session cookies expire after 30 days of inactivity.
         </p>
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-white mb-3">8. Your Rights</h2>
+        <h2 className="text-xl font-semibold text-orange-400 mb-3">8. Your Rights</h2>
         <p className="text-stone-300 leading-relaxed mb-3">
           Depending on where you are located, you may have the following rights regarding your personal data. To exercise any of these rights, contact us at bencoe@gmail.com.
         </p>
@@ -119,35 +119,35 @@ export default function PrivacyPolicy() {
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-white mb-3">9. Cookies &amp; Sessions</h2>
+        <h2 className="text-xl font-semibold text-orange-400 mb-3">9. Cookies &amp; Sessions</h2>
         <p className="text-stone-300 leading-relaxed">
           We use a single encrypted session cookie to keep you logged in. This cookie is strictly necessary for the Service to function and is not used for tracking, profiling, or advertising. It expires after 30 days of inactivity.
         </p>
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-white mb-3">10. Children&rsquo;s Privacy</h2>
+        <h2 className="text-xl font-semibold text-orange-400 mb-3">10. Children&rsquo;s Privacy</h2>
         <p className="text-stone-300 leading-relaxed">
           Allaboard is not directed at children. Users must be at least 16 years of age to create an account, in accordance with the UK GDPR and Canadian privacy law requirements for digital services. Users in the United States must be at least 13. We do not knowingly collect personal information from anyone below the applicable minimum age.
         </p>
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-white mb-3">11. Data Security</h2>
+        <h2 className="text-xl font-semibold text-orange-400 mb-3">11. Data Security</h2>
         <p className="text-stone-300 leading-relaxed">
           We take reasonable technical and organisational measures to protect your personal data against unauthorised access, loss, or disclosure. Session data is stored in an encrypted cookie. Database access is restricted and credentials are never exposed client-side.
         </p>
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-white mb-3">12. Changes to This Policy</h2>
+        <h2 className="text-xl font-semibold text-orange-400 mb-3">12. Changes to This Policy</h2>
         <p className="text-stone-300 leading-relaxed">
           We may update this Privacy Policy from time to time. We will notify users of significant changes by updating the date at the top of this page. Continued use of the Service after changes are posted constitutes acceptance of the updated Policy.
         </p>
       </section>
 
       <section className="mb-8">
-        <h2 className="text-xl font-semibold text-white mb-3">13. Contact</h2>
+        <h2 className="text-xl font-semibold text-orange-400 mb-3">13. Contact</h2>
         <p className="text-stone-300 leading-relaxed">
           For privacy questions, data access requests, correction requests, or data deletion requests, contact us at:{" "}
           <span className="text-orange-400">bencoe@gmail.com</span>. We aim to respond to all requests within 30 days.

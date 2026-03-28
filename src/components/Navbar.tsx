@@ -74,7 +74,7 @@ export default function Navbar() {
                   <div className="text-stone-400 text-xs truncate">@{user.handle}</div>
                 </div>
                 <Link
-                  href="/profile"
+                  href={`/user/${user.handle}`}
                   onClick={() => setDropdownOpen(false)}
                   className="flex items-center gap-2 px-4 py-2 text-sm text-stone-300 hover:text-white hover:bg-stone-700 transition-colors"
                 >

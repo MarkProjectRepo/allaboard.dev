@@ -342,9 +342,12 @@ All resources (climbs, sessions, log entries, profiles) are **publicly viewable*
 | `climbs` | `climbs.author` |
 | `sessions` | `sessions.user_id` |
 | `log_entries` | `log_entries.user_id` |
+| `ticks` | `ticks.user_id` |
 | `users` (profile) | `users.id` itself |
 
 ### Enforcement rules
+
+**Only the user who created a protected resource may edit or delete it.** No admin override exists in the current implementation.
 
 **API route handlers (PATCH / PUT / DELETE):**
 - Read `session.userId` from iron-session.
@@ -389,6 +392,7 @@ All routes are Next.js Route Handlers served under `/api/*` by the Next.js dev s
 | POST | `/api/log-entries` | `src/app/api/log-entries/route.ts` |
 | GET | `/api/feed?userId=` | `src/app/api/feed/route.ts` |
 | GET | `/api/stats/:userId` | `src/app/api/stats/[userId]/route.ts` |
+| DELETE | `/api/ticks/:id` | `src/app/api/ticks/[id]/route.ts` |
 | GET | `/api/auth/me` | `src/app/api/auth/me/route.ts` |
 | POST | `/api/auth/logout` | `src/app/api/auth/logout/route.ts` |
 | GET | `/api/auth/google` | `src/app/api/auth/google/route.ts` |
