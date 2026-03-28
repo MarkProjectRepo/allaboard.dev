@@ -13,7 +13,7 @@ export default function StatsPage() {
   const reload = useCallback(() => {
     void (async () => {
       const me = await getCurrentUser();
-      setStats(await computeStats(me.id));
+      if (me) setStats(await computeStats(me.id));
     })();
   }, []);
 

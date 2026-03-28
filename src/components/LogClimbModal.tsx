@@ -5,11 +5,12 @@ import { getClimbs, logClimb } from "@/lib/db";
 import { Climb } from "@/lib/types";
 
 interface Props {
+  userId: string;
   onClose: () => void;
   onLogged?: () => void;
 }
 
-export default function LogClimbModal({ onClose, onLogged }: Props) {
+export default function LogClimbModal({ userId, onClose, onLogged }: Props) {
   const [climbs, setClimbs] = useState<Climb[]>([]);
   const [sent, setSent] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -29,6 +30,7 @@ export default function LogClimbModal({ onClose, onLogged }: Props) {
       attempts: Number(fd.get("attempts")),
       sent,
       notes:    (fd.get("notes") as string) || undefined,
+      userId,
     });
     setSubmitted(true);
     onLogged?.();

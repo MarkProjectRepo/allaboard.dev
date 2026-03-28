@@ -1,8 +1,6 @@
-import { Router } from "express";
+import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
-import db from "../db";
-
-const router = Router();
+import db from "@/lib/server/db";
 
 async function buildSession(row: Record<string, unknown>) {
   const logEntries = await db("log_entries").where({ session_id: row.id }).orderBy("date");
@@ -15,46 +13,40 @@ async function buildSession(row: Record<string, unknown>) {
     durationMinutes: row.duration_minutes,
     feelRating: row.feel_rating,
     logEntries: logEntries.map((l) => ({
-      id: l.id,
-      climbId: l.climb_id,
-      userId: l.user_id,
-      date: l.date,
-      attempts: l.attempts,
-      sent: l.sent,
+      id: l.id, climbId: l.climb_id, userId: l.user_id,
+      date: l.date, attempts: l.attempts, sent: l.sent,
       notes: l.notes ?? undefined,
     })),
   };
 }
 
-// GET /sessions?userId=<handle>
-router.get("/", async (req, res) => {
+export async function GET(req: NextRequest) {
   try {
+    const userId = req.nextUrl.searchParams.get("userId");
     const query = db("sessions").orderBy("date", "desc");
-    if (req.query.userId) query.where({ user_id: req.query.userId });
+    if (userId) query.where({ user_id: userId });
     const rows = await query;
     const sessions = await Promise.all(rows.map(buildSession));
-    res.json(sessions);
+    return NextResponse.json(sessions);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to fetch sessions" });
+    return NextResponse.json({ error: "Failed to fetch sessions" }, { status: 500 });
   }
-});
+}
 
-// POST /sessions
-router.post("/", async (req, res) => {
+export async function POST(req: NextRequest) {
   try {
-    const { userId, date, boardType, angle, durationMinutes, feelRating } = req.body as Record<string, unknown>;
+    const { userId, date, boardType, angle, durationMinutes, feelRating } =
+      await req.json() as Record<string, unknown>;
     const id = uuidv4();
     await db("sessions").insert({
       id, user_id: userId, date, board_type: boardType,
       angle: angle ?? 40, duration_minutes: durationMinutes ?? 60, feel_rating: feelRating ?? 3,
     });
     const row = await db("sessions").where({ id }).first();
-    res.status(201).json(await buildSession(row));
+    return NextResponse.json(await buildSession(row), { status: 201 });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to create session" });
+    return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
   }
-});
-
-export default router;
+}

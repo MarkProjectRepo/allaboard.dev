@@ -1,14 +1,11 @@
-import { Router } from "express";
+import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
-import db from "../db";
+import db from "@/lib/server/db";
 
-const router = Router();
-
-// POST /log-entries  — add a climb log to a session (creates session if needed)
-router.post("/", async (req, res) => {
+export async function POST(req: NextRequest) {
   try {
     const { userId, climbId, date, attempts, sent, notes, boardType, angle, durationMinutes, feelRating } =
-      req.body as Record<string, unknown>;
+      await req.json() as Record<string, unknown>;
 
     // Find or create a session for this user+date
     let session = await db("sessions").where({ user_id: userId, date }).first();
@@ -27,26 +24,18 @@ router.post("/", async (req, res) => {
       date, attempts: attempts ?? 1, sent: sent ?? false, notes: notes ?? null,
     });
 
-    // Increment sends counter on climb if sent
     if (sent) {
       await db("climbs").where({ id: climbId }).increment("sends", 1);
     }
 
     const entry = await db("log_entries").where({ id }).first();
-    res.status(201).json({
-      id: entry.id,
-      sessionId: entry.session_id,
-      climbId: entry.climb_id,
-      userId: entry.user_id,
-      date: entry.date,
-      attempts: entry.attempts,
-      sent: entry.sent,
-      notes: entry.notes ?? undefined,
-    });
+    return NextResponse.json({
+      id: entry.id, sessionId: entry.session_id, climbId: entry.climb_id,
+      userId: entry.user_id, date: entry.date, attempts: entry.attempts,
+      sent: entry.sent, notes: entry.notes ?? undefined,
+    }, { status: 201 });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to log climb" });
+    return NextResponse.json({ error: "Failed to log climb" }, { status: 500 });
   }
-});
-
-export default router;
+}

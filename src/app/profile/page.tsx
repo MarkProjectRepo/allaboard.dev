@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { User, Session, ClimberStats, BoardType } from "@/lib/types";
-import { getCurrentUser, getSessions, computeStats } from "@/lib/db";
+import { Session, ClimberStats, BoardType } from "@/lib/types";
+import { getSessions, computeStats } from "@/lib/db";
+import { useAuth } from "@/lib/auth-context";
 import UserAvatar from "@/components/UserAvatar";
 import GradeBadge from "@/components/GradeBadge";
 import SessionCard from "@/components/SessionCard";
@@ -11,23 +12,40 @@ import Link from "next/link";
 const BOARD_ORDER: BoardType[] = ["Kilter", "Moonboard"];
 
 export default function ProfilePage() {
-  const [user, setUser]       = useState<User | null>(null);
+  const { user, loading: authLoading } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [stats, setStats]     = useState<ClimberStats | null>(null);
+  const [stats, setStats]       = useState<ClimberStats | null>(null);
 
   const reload = useCallback(() => {
+    if (!user) return;
     void (async () => {
-      const me = await getCurrentUser();
-      setUser(me);
-      const allSessions = await getSessions(me.id);
+      const allSessions = await getSessions(user.id);
       setSessions(allSessions.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4));
-      setStats(await computeStats(me.id));
+      setStats(await computeStats(user.id));
     })();
-  }, []);
+  }, [user]);
 
   useEffect(reload, [reload]);
 
-  if (!user || !stats) {
+  if (authLoading) {
+    return <div className="text-stone-500 text-center py-16">Loading…</div>;
+  }
+
+  if (!user) {
+    return (
+      <div className="text-center py-24">
+        <p className="text-stone-400 mb-4">Sign in to view your profile.</p>
+        <a
+          href="/api/auth/google"
+          className="inline-block px-5 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-400 text-white font-semibold text-sm transition-colors"
+        >
+          Login with Google
+        </a>
+      </div>
+    );
+  }
+
+  if (!stats) {
     return <div className="text-stone-500 text-center py-16">Loading…</div>;
   }
 

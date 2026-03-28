@@ -7,7 +7,23 @@ export default function UserAvatar({
   user: User;
   size?: "sm" | "md" | "lg";
 }) {
-  const dims = size === "lg" ? "w-16 h-16 text-xl" : size === "sm" ? "w-7 h-7 text-xs" : "w-9 h-9 text-sm";
+  const dims =
+    size === "lg" ? "w-16 h-16 text-xl" :
+    size === "sm" ? "w-7 h-7 text-xs"  :
+                    "w-9 h-9 text-sm";
+
+  if (user.profilePictureUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return (
+      <img
+        src={user.profilePictureUrl}
+        alt={user.displayName}
+        className={`${dims} rounded-full object-cover shrink-0`}
+        referrerPolicy="no-referrer"
+      />
+    );
+  }
+
   const initials = user.displayName
     .split(" ")
     .map((n) => n[0])

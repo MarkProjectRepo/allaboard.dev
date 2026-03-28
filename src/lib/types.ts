@@ -30,6 +30,7 @@ export interface User {
   handle: string;
   displayName: string;
   avatarColor: string; // tailwind bg color class for placeholder avatar
+  profilePictureUrl?: string; // Google account photo URL, if available
   bio: string;
   homeBoard: BoardType;
   homeBoardAngle: number;

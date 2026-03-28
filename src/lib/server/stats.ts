@@ -1,5 +1,5 @@
 import db from "./db";
-import type { Grade } from "../../src/lib/types";
+import type { Grade } from "@/lib/types";
 
 const GRADE_ORDER: Grade[] = [
   "V0","V1","V2","V3","V4","V5","V6","V7","V8",
@@ -8,6 +8,19 @@ const GRADE_ORDER: Grade[] = [
 
 function gradeIndex(g: string): number {
   return GRADE_ORDER.indexOf(g as Grade);
+}
+
+function toDateStr(value: string | Date): string {
+  return typeof value === "string" ? value : value.toISOString().slice(0, 10);
+}
+
+function isoWeekMonday(dateStr: string): string {
+  const d = new Date(dateStr);
+  const day = d.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const mon = new Date(d);
+  mon.setUTCDate(d.getUTCDate() + diff);
+  return mon.toISOString().slice(0, 10);
 }
 
 export async function computeStats(userId: string) {
@@ -26,7 +39,7 @@ export async function computeStats(userId: string) {
     .join("climbs", "log_entries.climb_id", "climbs.id")
     .select("log_entries.*", "climbs.grade as climb_grade", "climbs.name as climb_name");
 
-  // Grade pyramid — count sends per grade
+  // Grade pyramid
   const sendsByGrade: Record<string, number> = {};
   for (const e of entries) {
     if (e.sent) sendsByGrade[e.climb_grade] = (sendsByGrade[e.climb_grade] ?? 0) + 1;
@@ -35,18 +48,10 @@ export async function computeStats(userId: string) {
     .sort(([a], [b]) => gradeIndex(b) - gradeIndex(a))
     .map(([grade, sends]) => ({ grade: grade as Grade, sends }));
 
-  // Session frequency — group by ISO week (Mon)
-  function isoWeekMonday(dateStr: string): string {
-    const d = new Date(dateStr);
-    const day = d.getUTCDay(); // 0=Sun
-    const diff = (day === 0 ? -6 : 1 - day);
-    const mon = new Date(d);
-    mon.setUTCDate(d.getUTCDate() + diff);
-    return mon.toISOString().slice(0, 10);
-  }
+  // Session frequency by ISO week
   const countByWeek: Record<string, number> = {};
   for (const s of sessions) {
-    const w = isoWeekMonday(s.date);
+    const w = isoWeekMonday(toDateStr(s.date));
     countByWeek[w] = (countByWeek[w] ?? 0) + 1;
   }
   const sessionFrequency = Object.entries(countByWeek)
@@ -57,11 +62,11 @@ export async function computeStats(userId: string) {
       return { weekLabel: label, sessionCount };
     });
 
-  // Progress over time — group by month
+  // Progress over time by month
   const sendsByMonth: Record<string, { highestIdx: number; total: number }> = {};
   for (const e of entries) {
     if (!e.sent) continue;
-    const month = e.date.slice(0, 7); // "YYYY-MM"
+    const month = toDateStr(e.date).slice(0, 7);
     if (!sendsByMonth[month]) sendsByMonth[month] = { highestIdx: -1, total: 0 };
     sendsByMonth[month].total += 1;
     const idx = gradeIndex(e.climb_grade);
@@ -76,7 +81,7 @@ export async function computeStats(userId: string) {
       return { month: label, highestGradeSent: GRADE_ORDER[highestIdx], totalSends: total };
     });
 
-  // Attempts vs sends — per climb
+  // Attempts vs sends per climb
   const statsByClimb: Record<string, { name: string; grade: string; attempts: number; sends: number }> = {};
   for (const e of entries) {
     if (!statsByClimb[e.climb_id]) {
@@ -92,11 +97,10 @@ export async function computeStats(userId: string) {
   const totalSends = entries.filter((e) => e.sent).length;
   const totalAttempts = entries.reduce((acc, e) => acc + e.attempts, 0);
 
-  // Current streak — consecutive weeks with at least one session, counting back from most recent
+  // Current streak — consecutive weeks with sessions, counting back from now
   const weekSet = new Set(Object.keys(countByWeek));
   let streak = 0;
-  const now = new Date();
-  let cursor = new Date(isoWeekMonday(now.toISOString().slice(0, 10)));
+  let cursor = new Date(isoWeekMonday(new Date().toISOString().slice(0, 10)));
   while (weekSet.has(cursor.toISOString().slice(0, 10))) {
     streak++;
     cursor.setUTCDate(cursor.getUTCDate() - 7);

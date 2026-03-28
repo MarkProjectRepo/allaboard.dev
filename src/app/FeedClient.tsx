@@ -3,40 +3,59 @@
 import { useState, useEffect, useCallback } from "react";
 import { FeedActivity } from "@/lib/types";
 import { getFeedActivities } from "@/lib/db";
+import { useAuth } from "@/lib/auth-context";
 import { timeAgo } from "@/lib/utils";
 import GradeBadge from "@/components/GradeBadge";
 import UserAvatar from "@/components/UserAvatar";
 import LogClimbModal from "@/components/LogClimbModal";
 
+type FeedTab = "all" | "following";
+
 export default function FeedClient() {
+  const { user } = useAuth();
+  const [tab, setTab] = useState<FeedTab>("all");
   const [activities, setActivities] = useState<FeedActivity[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
 
   const reload = useCallback(() => {
+    const userId = tab === "following" && user ? user.id : undefined;
     void (async () => {
-      setActivities(await getFeedActivities());
+      setActivities(await getFeedActivities(userId));
     })();
-  }, []);
+  }, [tab, user]);
 
   useEffect(reload, [reload]);
 
+  // Reset to "all" if the user logs out while on the "following" tab
+  useEffect(() => {
+    if (!user && tab === "following") setTab("all");
+  }, [user, tab]);
+
   return (
     <>
-      {modalOpen && (
-        <LogClimbModal onClose={() => setModalOpen(false)} onLogged={reload} />
+      {modalOpen && user && (
+        <LogClimbModal userId={user.id} onClose={() => setModalOpen(false)} onLogged={reload} />
       )}
 
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Following</h1>
-          <p className="text-stone-400 mt-1">Recent activity from people you follow</p>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex gap-1">
+          <TabButton active={tab === "all"} onClick={() => setTab("all")}>
+            All Activity
+          </TabButton>
+          {user && (
+            <TabButton active={tab === "following"} onClick={() => setTab("following")}>
+              Following
+            </TabButton>
+          )}
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="bg-orange-500 hover:bg-orange-400 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors"
-        >
-          + Log Climb
-        </button>
+        {user && (
+          <button
+            onClick={() => setModalOpen(true)}
+            className="bg-orange-500 hover:bg-orange-400 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors"
+          >
+            + Log Climb
+          </button>
+        )}
       </div>
 
       {activities.length === 0 ? (
@@ -49,6 +68,29 @@ export default function FeedClient() {
         </div>
       )}
     </>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+        active
+          ? "bg-stone-800 text-white"
+          : "text-stone-400 hover:text-white hover:bg-stone-800"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

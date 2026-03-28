@@ -1,15 +1,14 @@
 /**
- * Remote (Postgres-backed) implementation of the data layer.
- * Calls the Express API running on localhost:3001.
+ * Data access layer — calls Next.js API route handlers at /api/*.
+ * Credentials are included on every request so the auth session cookie is sent.
  */
 
 import { Climb, User, Session, LogEntry, ClimberStats, FeedActivity } from "@/lib/types";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
+  const res = await fetch(`/api${path}`, {
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     ...init,
   });
   if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
@@ -18,7 +17,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 // ─── No-op stubs kept for API compatibility ───────────────────────────────────
 
-export function initStorage(): void { /* no-op: DB is always ready */ }
+export function initStorage(): void { /* no-op */ }
 export function resetStorage(): void { /* no-op */ }
 
 // ─── Climbs ───────────────────────────────────────────────────────────────────
@@ -53,12 +52,16 @@ export async function getUserById(id: string): Promise<User | undefined> {
   }
 }
 
-export async function getCurrentUser(): Promise<User> {
-  return api<User>("/users/alex_sends");
+export async function getCurrentUser(): Promise<User | null> {
+  try {
+    return await api<User>("/auth/me");
+  } catch {
+    return null;
+  }
 }
 
-export async function updateCurrentUser(patch: Partial<Omit<User, "id">>): Promise<User> {
-  return api<User>("/users/alex_sends", { method: "PATCH", body: JSON.stringify(patch) });
+export async function updateCurrentUser(userId: string, patch: Partial<Omit<User, "id">>): Promise<User> {
+  return api<User>(`/users/${encodeURIComponent(userId)}`, { method: "PATCH", body: JSON.stringify(patch) });
 }
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
@@ -69,28 +72,26 @@ export async function getSessions(userId?: string): Promise<Session[]> {
 }
 
 export async function logClimb({
-  climbId,
-  date,
-  attempts,
-  sent,
-  notes,
+  climbId, date, attempts, sent, notes, userId,
 }: {
   climbId: string;
   date: string;
   attempts: number;
   sent: boolean;
   notes?: string;
+  userId: string;
 }): Promise<LogEntry> {
   return api<LogEntry>("/log-entries", {
     method: "POST",
-    body: JSON.stringify({ climbId, date, attempts, sent, notes, userId: "alex_sends" }),
+    body: JSON.stringify({ climbId, date, attempts, sent, notes, userId }),
   });
 }
 
 // ─── Feed ─────────────────────────────────────────────────────────────────────
 
-export async function getFeedActivities(): Promise<FeedActivity[]> {
-  return api<FeedActivity[]>("/feed?userId=alex_sends");
+export async function getFeedActivities(userId?: string): Promise<FeedActivity[]> {
+  const qs = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+  return api<FeedActivity[]>(`/feed${qs}`);
 }
 
 // ─── Stats ────────────────────────────────────────────────────────────────────

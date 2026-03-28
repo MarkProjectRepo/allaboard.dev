@@ -1,8 +1,6 @@
-import { Router } from "express";
+import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
-import db from "../db";
-
-const router = Router();
+import db from "@/lib/server/db";
 
 function toClimb(row: Record<string, unknown>, videos: Record<string, unknown>[]) {
   return {
@@ -25,8 +23,7 @@ function toClimb(row: Record<string, unknown>, videos: Record<string, unknown>[]
   };
 }
 
-// GET /climbs
-router.get("/", async (_req, res) => {
+export async function GET() {
   try {
     const rows = await db("climbs").orderBy("created_at", "desc");
     const climbIds = rows.map((r) => r.id);
@@ -40,48 +37,29 @@ router.get("/", async (_req, res) => {
       videosByClimb[v.climb_id].push(v);
     }
 
-    res.json(rows.map((r) => toClimb(r, videosByClimb[r.id] ?? [])));
+    return NextResponse.json(rows.map((r) => toClimb(r, videosByClimb[r.id] ?? [])));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to fetch climbs" });
+    return NextResponse.json({ error: "Failed to fetch climbs" }, { status: 500 });
   }
-});
+}
 
-// GET /climbs/:id
-router.get("/:id", async (req, res) => {
+export async function POST(req: NextRequest) {
   try {
-    const row = await db("climbs").where({ id: req.params.id }).first();
-    if (!row) return res.status(404).json({ error: "Not found" });
-    const videos = await db("beta_videos").where({ climb_id: row.id }).orderBy("sort_order");
-    res.json(toClimb(row, videos));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch climb" });
-  }
-});
-
-// POST /climbs
-router.post("/", async (req, res) => {
-  try {
-    const { name, grade, boardType, angle, description, author, setter, sends } = req.body as Record<string, unknown>;
+    const { name, grade, boardType, angle, description, author, setter, sends } =
+      await req.json() as Record<string, unknown>;
     const id = uuidv4();
     await db("climbs").insert({
-      id,
-      name,
-      grade,
-      board_type: boardType,
-      angle: angle ?? null,
-      description,
-      author: author ?? "alex_sends",
+      id, name, grade, board_type: boardType,
+      angle: angle ?? null, description,
+      author: author ?? null,
       setter: setter ?? null,
       sends: sends ?? 0,
     });
     const row = await db("climbs").where({ id }).first();
-    res.status(201).json(toClimb(row, []));
+    return NextResponse.json(toClimb(row, []), { status: 201 });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to create climb" });
+    return NextResponse.json({ error: "Failed to create climb" }, { status: 500 });
   }
-});
-
-export default router;
+}
