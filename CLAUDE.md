@@ -433,6 +433,12 @@ interface FeedActivity { id, user, climb, date, attempts, sent, notes }
 
 ---
 
+## Testing Policy
+
+When adding a new feature, new tests may be added to cover that feature. However, **do not modify existing tests** as part of a feature or bug-fix prompt — existing tests serve as a regression baseline and should remain unchanged unless explicitly instructed to update them. Test updates should be requested in a separate, subsequent prompt from the one that introduced the feature or change.
+
+---
+
 ## Adding New Features — Common Patterns
 
 ### Add a new API endpoint
