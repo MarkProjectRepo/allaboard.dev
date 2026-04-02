@@ -4,16 +4,17 @@ import { withSentryConfig } from "@sentry/nextjs";
 const nextConfig: NextConfig = {
   serverExternalPackages: ["knex", "pg", "pg-native"],
 
-  // Redirect /docs to /docs/index.html so the TypeDoc static site loads.
-  // Redirecting to /docs/ would loop: Next.js (trailingSlash: false) strips
-  // the trailing slash back to /docs, which hits this rule again.
-  // Pointing directly at the file avoids the loop, and all relative asset
-  // paths in the TypeDoc HTML still resolve correctly (base dir stays /docs/).
+  // Redirect legacy /docs path to the Scalar API reference page.
   async redirects() {
     return [
       {
         source: "/docs",
-        destination: "/docs/index.html",
+        destination: "/api-docs",
+        permanent: false,
+      },
+      {
+        source: "/docs/:path*",
+        destination: "/api-docs",
         permanent: false,
       },
     ];

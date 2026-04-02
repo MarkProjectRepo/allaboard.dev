@@ -1,0 +1,815 @@
+openapi: 3.0.3
+info:
+  title: allaboard.dev API
+  version: "1.0"
+  description: REST API for the Allaboard board-climbing community platform.
+servers:
+  - url: https://allaboard.dev
+    description: Production
+  - url: http://localhost:3000
+    description: Local development
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: allaboard_session
+      description: iron-session encrypted cookie set after Google OAuth login.
+    apiKeyAuth:
+      type: apiKey
+      in: query
+      name: token
+      description: Personal API token from your profile page. Pass as ?token=<value>.
+paths:
+  /api/auth/me:
+    get:
+      summary: Return the profile of the currently authenticated user.
+      responses:
+        "200":
+          description: The user's profile object, identical in shape to GET /api/users/:handle but always for the caller themselves.
+        "401":
+          description: the session refers to a user that no longer exists.
+      security:
+        - apiKeyAuth: []
+        - cookieAuth: []
+  /api/boards/{id}:
+    patch:
+      summary: Update a board's name, location, or description.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The updated board object.
+        "400":
+          description: no fields are provided.
+        "401":
+          description: not authenticated.
+        "403":
+          description: the caller did not create the board.
+        "404":
+          description: the board does not exist.
+        "500":
+          description: database error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: new display name.
+                location:
+                  type: string
+                  description: physical location (spray walls only).
+                description:
+                  type: string
+                  description: free-form description.
+      security:
+        - apiKeyAuth: []
+        - cookieAuth: []
+  /api/boards:
+    get:
+      summary: List all boards, sorted alphabetically by name.
+      parameters:
+        - name: type
+          in: query
+          required: false
+          description: filter to "standard" or "spray_wall".
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Array of board objects.
+        "500":
+          description: database error.
+    post:
+      summary: Create a new board.
+      responses:
+        "201":
+          description: The created board object with status 201.
+        "400":
+          description: name is missing, type is invalid, or location is missing for spray walls.
+        "401":
+          description: not authenticated.
+        "500":
+          description: database error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - type
+              properties:
+                name:
+                  type: string
+                  description: board display name.
+                type:
+                  type: string
+                  description: "\"standard\" or \"spray_wall\"."
+                location:
+                  type: string
+                  description: physical location description.
+                description:
+                  type: string
+                  description: free-form description.
+      security:
+        - cookieAuth: []
+  /api/climbs/{id}/beta-videos:
+    post:
+      summary: Attach an Instagram video URL to a climb as a beta video.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: "{ \"url\": \"...\", \"thumbnail\": \"...\" } with status 201."
+        "400":
+          description: url is missing.
+        "401":
+          description: not authenticated.
+        "403":
+          description: the caller is not the climb author.
+        "404":
+          description: the climb does not exist.
+        "500":
+          description: database error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  description: full Instagram post or reel URL.
+      security:
+        - cookieAuth: []
+    delete:
+      summary: Remove a beta video URL from a climb.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: url
+          in: query
+          required: true
+          description: the exact URL to remove.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "{ \"ok\": true } on success."
+        "401":
+          description: not authenticated.
+        "403":
+          description: the caller is not the climb author.
+        "404":
+          description: the climb does not exist.
+        "500":
+          description: database error.
+      security:
+        - cookieAuth: []
+  /api/climbs/{id}:
+    get:
+      summary: Fetch a single climb by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The climb object including embedded betaVideos (Instagram URLs with the handle of the user who submitted each video).
+        "404":
+          description: the climb does not exist.
+        "500":
+          description: database error.
+    patch:
+      summary: Update a climb's metadata.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The updated climb object.
+        "400":
+          description: no fields are provided.
+        "401":
+          description: not authenticated.
+        "403":
+          description: the caller is not the climb author.
+        "404":
+          description: the climb does not exist.
+        "500":
+          description: database error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: climb name.
+                grade:
+                  type: string
+                  description: V-grade string ("V0" – "V18").
+                boardId:
+                  type: string
+                  description: UUID of the board.
+                angle:
+                  type: string
+                  description: wall angle in degrees.
+                description:
+                  type: string
+                  description: free-form description / beta.
+                setter:
+                  type: string
+                  description: route setter name.
+      security:
+        - apiKeyAuth: []
+        - cookieAuth: []
+  /api/climbs/{id}/ticks:
+    get:
+      summary: List all ticks for a climb, newest first.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Array of tick objects, each embedding the submitting user's handle, display name, avatar color, and profile picture URL.
+        "500":
+          description: database error.
+    post:
+      summary: Submit a tick (send record) for a climb.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: The created tick object with status 201.
+        "400":
+          description: rating is missing or outside 1–4.
+        "401":
+          description: not authenticated.
+        "404":
+          description: the climb does not exist.
+        "500":
+          description: database error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - rating
+              properties:
+                rating:
+                  type: string
+                  description: star rating 1–4.
+                date:
+                  type: string
+                  description: ISO date string ("YYYY-MM-DD"); defaults to today.
+                sent:
+                  type: string
+                  description: whether the climb was completed.
+                attempts:
+                  type: string
+                  description: number of attempts.
+                suggestedGrade:
+                  type: string
+                  description: the climber's grade opinion ("V0"–"V18").
+                comment:
+                  type: string
+                  description: free-form send notes.
+                instagramUrl:
+                  type: string
+                  description: URL to an Instagram post/reel of the send.
+      security:
+        - cookieAuth: []
+  /api/climbs:
+    get:
+      summary: List climbs with optional filtering and sorting.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: case-insensitive name search substring.
+          schema:
+            type: string
+        - name: gradeMin
+          in: query
+          required: false
+          description: lower bound grade (e.g. "V4"); inclusive.
+          schema:
+            type: string
+        - name: gradeMax
+          in: query
+          required: false
+          description: upper bound grade (e.g. "V8"); inclusive.
+          schema:
+            type: string
+        - name: angleMin
+          in: query
+          required: false
+          description: minimum wall angle (degrees); inclusive.
+          schema:
+            type: string
+        - name: angleMax
+          in: query
+          required: false
+          description: maximum wall angle (degrees); inclusive.
+          schema:
+            type: string
+        - name: boardId
+          in: query
+          required: false
+          description: filter to a specific board UUID.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: results per page, max 100 (default 25).
+          schema:
+            type: string
+        - name: offset
+          in: query
+          required: false
+          description: pagination offset (default 0).
+          schema:
+            type: string
+        - name: sort
+          in: query
+          required: false
+          description: one of sends_desc *(default)*, star_rating_desc,
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Paginated response: ``json { \"climbs\": [ { \"id\": \"uuid\", \"name\": \"The Riddler\", \"grade\": \"V5\", ... } ], \"hasMore\": true } ``"
+        "500":
+          description: database error.
+    post:
+      summary: Submit a new climb to the directory.
+      responses:
+        "201":
+          description: The created climb object with status 201.
+        "400":
+          description: name, grade, or boardId are missing, or if boardId is invalid.
+        "401":
+          description: not authenticated.
+        "409":
+          description: a climb with the same name, grade, angle, and board already exists.
+        "500":
+          description: database error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - grade
+                - boardId
+              properties:
+                name:
+                  type: string
+                  description: climb name.
+                grade:
+                  type: string
+                  description: V-grade string ("V0" – "V18").
+                boardId:
+                  type: string
+                  description: UUID of the board the climb is set on.
+                angle:
+                  type: string
+                  description: wall angle in degrees; omitted for spray walls.
+                description:
+                  type: string
+                  description: free-form description / beta.
+                setter:
+                  type: string
+                  description: name of the route setter (may differ from author).
+      security:
+        - apiKeyAuth: []
+        - cookieAuth: []
+  /api/feed:
+    get:
+      summary: Fetch the global activity feed (most recent 50 ticks, newest first).
+      responses:
+        "200":
+          description: "Array of feed activity objects: ``json [ { \"id\": \"uuid\", \"date\": \"2026-04-01T...\", \"sent\": true, \"rating\": 3, \"comment\": \"Great problem!\", \"suggestedGrade\": \"V5\", \"instagramUrl\": \"https://www.instagram.com/reel/...\", \"attempts\": 4, \"user\": { \"id\": \"alex\", \"handle\": \"alex\", \"displayName\": \"Alex\", ... }, \"climb\": { \"id\": \"uuid\", \"name\": \"The Riddler\", \"grade\": \"V5\", ... } } ] ``"
+        "500":
+          description: database error.
+  /api/health:
+    get:
+      summary: Check that the API server is reachable.
+      responses:
+        "200":
+          description: "{ ok: true } — always returns 200 when the server is up."
+  /api/log-entries:
+    post:
+      summary: Log a climb attempt, auto-creating a session for the day if needed.
+      responses:
+        "201":
+          description: "The created log entry object with status 201: ``json { \"id\": \"uuid\", \"sessionId\": \"uuid\", \"climbId\": \"uuid\", \"userId\": \"alex\", \"date\": \"2026-04-01\", \"attempts\": 3, \"sent\": true, \"notes\": \"Crux is the second move.\" } ``"
+        "401":
+          description: not authenticated.
+        "403":
+          description: userId does not match the authenticated caller.
+        "500":
+          description: database error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+                - climbId
+                - date
+              properties:
+                userId:
+                  type: string
+                  description: owner handle; must match the authenticated caller.
+                climbId:
+                  type: string
+                  description: UUID of the climb being logged.
+                date:
+                  type: string
+                  description: ISO date string ("YYYY-MM-DD").
+                attempts:
+                  type: string
+                  description: number of attempts.
+                sent:
+                  type: string
+                  description: whether the climb was completed.
+                notes:
+                  type: string
+                  description: free-form text notes.
+                boardType:
+                  type: string
+                  description: used when auto-creating a session.
+                angle:
+                  type: string
+                  description: used when auto-creating a session.
+                durationMinutes:
+                  type: string
+                  description: used when auto-creating a session.
+                feelRating:
+                  type: string
+                  description: used when auto-creating a session.
+      security:
+        - apiKeyAuth: []
+        - cookieAuth: []
+  /api/sessions:
+    get:
+      summary: List climbing sessions, optionally filtered to a single user.
+      parameters:
+        - name: userId
+          in: query
+          required: false
+          description: filter sessions to this user handle.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Array of session objects ordered newest first. Each session embeds its logEntries array.
+        "500":
+          description: database error.
+    post:
+      summary: Create a new climbing session.
+      responses:
+        "201":
+          description: The created session object with status 201.
+        "401":
+          description: not authenticated.
+        "403":
+          description: userId does not match the authenticated caller.
+        "500":
+          description: database error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+                - date
+              properties:
+                userId:
+                  type: string
+                  description: owner handle; must match the authenticated caller.
+                date:
+                  type: string
+                  description: ISO date string ("YYYY-MM-DD").
+                boardType:
+                  type: string
+                  description: board name string.
+                angle:
+                  type: string
+                  description: wall angle in degrees.
+                durationMinutes:
+                  type: string
+                  description: session length.
+                feelRating:
+                  type: string
+                  description: subjective feel score 1–5.
+      security:
+        - apiKeyAuth: []
+        - cookieAuth: []
+  /api/stats/{userId}:
+    get:
+      summary: Compute and return climbing statistics for a user.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A ClimberStats object.
+        "500":
+          description: database error.
+  /api/ticks/{id}:
+    patch:
+      summary: Update an existing tick.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The updated tick row.
+        "400":
+          description: rating is provided and outside 1–4.
+        "401":
+          description: not authenticated.
+        "403":
+          description: the caller does not own the tick.
+        "404":
+          description: the tick does not exist.
+        "500":
+          description: database error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                date:
+                  type: string
+                  description: ISO date string ("YYYY-MM-DD").
+                sent:
+                  type: string
+                  description: whether the climb was completed.
+                attempts:
+                  type: string
+                  description: number of attempts.
+                suggestedGrade:
+                  type: string
+                  description: grade opinion ("V0"–"V18").
+                rating:
+                  type: string
+                  description: star rating 1–4.
+                comment:
+                  type: string
+                  description: free-form notes.
+                instagramUrl:
+                  type: string
+                  description: Instagram post URL of the send.
+      security:
+        - apiKeyAuth: []
+        - cookieAuth: []
+    delete:
+      summary: Delete a tick.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content on success.
+        "401":
+          description: not authenticated.
+        "403":
+          description: the caller does not own the tick.
+        "404":
+          description: the tick does not exist.
+        "500":
+          description: database error.
+      security:
+        - apiKeyAuth: []
+        - cookieAuth: []
+  /api/ticks:
+    get:
+      summary: List all ticks submitted by a specific user, newest first.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          description: the user handle to fetch ticks for.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Array of tick objects, each including embedded climb name, grade, board name, and angle.
+        "400":
+          description: userId is not provided.
+        "500":
+          description: database error.
+  /api/users/{handle}/follow:
+    post:
+      summary: Follow a user.
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "{ \"following\": true } on success."
+        "400":
+          description: attempting to follow yourself.
+        "401":
+          description: not authenticated.
+        "404":
+          description: the target handle does not exist.
+        "500":
+          description: database error.
+      security:
+        - apiKeyAuth: []
+        - cookieAuth: []
+    delete:
+      summary: Unfollow a user.
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "{ \"following\": false } on success."
+        "401":
+          description: not authenticated.
+        "404":
+          description: the target handle does not exist.
+        "500":
+          description: database error.
+      security:
+        - apiKeyAuth: []
+        - cookieAuth: []
+    get:
+      summary: Check whether the authenticated user follows a given handle.
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "{ \"following\": true | false }."
+        "500":
+          description: database error.
+  /api/users/{handle}/followers:
+    get:
+      summary: List all users who follow the given handle, newest followers first.
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Array of user profile objects representing the followers.
+        "404":
+          description: the handle does not exist.
+        "500":
+          description: database error.
+  /api/users/{handle}/following:
+    get:
+      summary: List all users that the given handle follows, newest first.
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Array of user profile objects representing the accounts being followed.
+        "404":
+          description: the handle does not exist.
+        "500":
+          description: database error.
+  /api/users/{handle}:
+    get:
+      summary: Fetch a user's public profile by handle.
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "The user profile object. When the viewer is the profile owner, the response additionally includes: - apiToken — UUID v4 token for authenticating API requests."
+        "404":
+          description: the handle does not exist.
+        "500":
+          description: database error.
+    patch:
+      summary: Update the authenticated user's own profile.
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated user profile including apiToken.
+        "400":
+          description: no updateable fields are provided.
+        "401":
+          description: not authenticated.
+        "403":
+          description: authenticated as a different user.
+        "500":
+          description: database error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                  description: display name string
+                bio:
+                  type: string
+                  description: profile bio text
+                homeBoard:
+                  type: string
+                  description: home board name (e.g. "Kilter Board (Original)")
+                homeBoardAngle:
+                  type: string
+                  description: integer angle (degrees)
+                personalBests:
+                  type: string
+                  description: object with optional Kilter and/or Moonboard grade strings
+      security:
+        - apiKeyAuth: []
+        - cookieAuth: []
+  /api/users:
+    get:
+      summary: List all users, sorted alphabetically by handle.
+      responses:
+        "200":
+          description: Array of user objects (no apiToken field — tokens are only returned when a user fetches their own profile via GET /api/users/:handle).
+        "500":
+          description: database error.

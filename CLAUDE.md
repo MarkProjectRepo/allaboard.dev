@@ -505,6 +505,36 @@ When adding a new feature, new tests may be added to cover that feature. However
 
 ---
 
+## API Documentation
+
+Interactive API docs are served at `/api-docs` via [Scalar](https://scalar.com).
+The spec is a generated `public/openapi.yaml` derived from the TSDoc comments in the route handlers.
+
+### How the spec is generated
+
+- **Source:** JSDoc on every exported `GET` / `POST` / `PATCH` / `DELETE` / `PUT` function in `src/app/api/**\/route.ts`
+- **Generator:** `scripts/generate-openapi.mjs` — run with `npm run generate:openapi`
+- **Output:** `public/openapi.yaml` (served as a static file by Next.js)
+
+### When the spec is (re)generated
+
+| Trigger | Mechanism |
+|---------|-----------|
+| `npm run dev` | Generator runs once before Next.js starts; `src/instrumentation.ts` then watches `src/app/api/**/*.ts` and regenerates on every save |
+| `npm run build` / `npm run vercel-build` | Generator runs as part of the build script before `next build` |
+| Manual | `npm run generate:openapi` |
+
+### JSDoc format expected by the generator
+
+The generator extracts:
+- **Summary** — first paragraph of the function JSDoc
+- **Auth** — `**Authentication:** Required` / `Not required` text sets `security` on the operation
+- **Query params** — bullet list items under `@param req` when the handler is `GET`
+- **Body fields** — bullet list items under `@param req` when the handler is `POST`/`PATCH`/`PUT`
+- **Response codes** — `@returns \`NNN\`` tags; the first tagless `@returns` becomes the 200 description
+
+---
+
 ## Adding New Features — Common Patterns
 
 ### Add a new API endpoint

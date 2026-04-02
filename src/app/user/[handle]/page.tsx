@@ -382,7 +382,7 @@ export default function UserProfilePage() {
             </div>
             <p className="text-stone-500 text-xs">
               View the{" "}
-              <a href="/docs/" target="_blank" rel="noreferrer" className="text-orange-400 hover:text-orange-300 underline">
+              <a href="/api-docs" className="text-orange-400 hover:text-orange-300 underline">
                 API documentation
               </a>{" "}
               for available endpoints and usage examples.

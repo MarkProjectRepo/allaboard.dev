@@ -3,15 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "vercel-build": "npm --prefix api run migrate && next build",
-    "start": "next start",
+    "generate:openapi": "node scripts/generate-openapi.mjs",
+    "dev": "node scripts/generate-openapi.mjs && next dev",
+    "build": "node scripts/generate-openapi.mjs && next build",
+    "vercel-build": "npm --prefix api run migrate && node scripts/generate-openapi.mjs && next build",
+    "start": "node scripts/generate-openapi.mjs && next start",
     "lint": "eslint",
     "test": "jest",
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
+    "@scalar/api-reference-react": "^0.9.18",
     "@sentry/nextjs": "^10.46.0",
     "iron-session": "^8.0.4",
     "knex": "^3.1.0",
