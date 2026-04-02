@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getIronSession } from "iron-session";
-import { cookies } from "next/headers";
 import db from "@/lib/server/db";
-import { sessionOptions, type SessionData } from "@/lib/server/session";
+import { resolveUserId } from "@/lib/server/resolveUserId";
 
 function toClimb(row: Record<string, unknown>, videos: Record<string, unknown>[]) {
   return {
@@ -54,14 +52,14 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
-  if (!session.userId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  const userId = await resolveUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
   try {
     const { id } = await params;
     const climb = await db("climbs").where({ id }).first();
     if (!climb) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (climb.author !== session.userId) {
+    if (climb.author !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

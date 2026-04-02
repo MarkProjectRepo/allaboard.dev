@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getIronSession } from "iron-session";
-import { cookies } from "next/headers";
 import db from "@/lib/server/db";
-import { sessionOptions, type SessionData } from "@/lib/server/session";
+import { resolveUserId } from "@/lib/server/resolveUserId";
 import { toUser } from "../route";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ handle: string }> },
 ) {
   try {
     const { handle } = await params;
     const row = await db("users").where({ handle }).first();
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json(toUser(row));
+
+    // Include the API token only when the requester is viewing their own profile
+    const viewerId = await resolveUserId(req);
+    const user = toUser(row);
+    if (viewerId === row.id) {
+      return NextResponse.json({ ...user, apiToken: row.api_token });
+    }
+    return NextResponse.json(user);
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Failed to fetch user" }, { status: 500 });
@@ -25,11 +30,11 @@ export async function PATCH(
   { params }: { params: Promise<{ handle: string }> },
 ) {
   try {
-    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
-    if (!session.userId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    const userId = await resolveUserId(req);
+    if (!userId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
     const { handle } = await params;
-    if (session.userId !== handle) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (userId !== handle) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const { displayName, bio, homeBoard, homeBoardAngle, personalBests } =
       await req.json() as Record<string, unknown>;
@@ -51,7 +56,7 @@ export async function PATCH(
     await db("users").where({ handle }).update(patch);
     const row = await db("users").where({ handle }).first();
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json(toUser(row));
+    return NextResponse.json({ ...toUser(row), apiToken: row.api_token });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Failed to update user" }, { status: 500 });

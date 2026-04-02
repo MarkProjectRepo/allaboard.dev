@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getIronSession } from "iron-session";
-import { cookies } from "next/headers";
 import db from "@/lib/server/db";
-import { sessionOptions, type SessionData } from "@/lib/server/session";
+import { resolveUserId } from "@/lib/server/resolveUserId";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
-  if (!session.userId) {
+  const userId = await resolveUserId(req);
+  if (!userId) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }
 
@@ -18,7 +16,7 @@ export async function PATCH(
 
     const tick = await db("ticks").where({ id }).first();
     if (!tick) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (tick.user_id !== session.userId) {
+    if (tick.user_id !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -73,11 +71,11 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
-  if (!session.userId) {
+  const userId = await resolveUserId(req);
+  if (!userId) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }
 
@@ -86,7 +84,7 @@ export async function DELETE(
 
     const tick = await db("ticks").where({ id }).first();
     if (!tick) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (tick.user_id !== session.userId) {
+    if (tick.user_id !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

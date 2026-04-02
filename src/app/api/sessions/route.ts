@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
-import { getIronSession } from "iron-session";
-import { cookies } from "next/headers";
 import db from "@/lib/server/db";
-import { sessionOptions, type SessionData } from "@/lib/server/session";
+import { resolveUserId } from "@/lib/server/resolveUserId";
 
 async function buildSession(row: Record<string, unknown>) {
   const logEntries = await db("log_entries").where({ session_id: row.id }).orderBy("date");
@@ -39,13 +37,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const ironSession = await getIronSession<SessionData>(await cookies(), sessionOptions);
-    if (!ironSession.userId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    const resolvedId = await resolveUserId(req);
+    if (!resolvedId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
     const { userId, date, boardType, angle, durationMinutes, feelRating } =
       await req.json() as Record<string, unknown>;
 
-    if (userId !== ironSession.userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (userId !== resolvedId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     const id = uuidv4();
     await db("sessions").insert({
       id, user_id: userId, date, board_type: boardType,

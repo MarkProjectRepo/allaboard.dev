@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getIronSession } from "iron-session";
-import { cookies } from "next/headers";
 import db from "@/lib/server/db";
-import { sessionOptions, type SessionData } from "@/lib/server/session";
+import { resolveUserId } from "@/lib/server/resolveUserId";
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ handle: string }> },
 ) {
   try {
-    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
-    if (!session.userId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    const userId = await resolveUserId(req);
+    if (!userId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
     const { handle } = await params;
-    if (session.userId === handle) {
+    if (userId === handle) {
       return NextResponse.json({ error: "Cannot follow yourself" }, { status: 400 });
     }
 
@@ -21,13 +19,12 @@ export async function POST(
     if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     await db("follows")
-      .insert({ follower_id: session.userId, following_id: target.id })
+      .insert({ follower_id: userId, following_id: target.id })
       .onConflict(["follower_id", "following_id"])
       .ignore();
 
-    // Update counts
     await db("users").where({ id: target.id }).increment("followers_count", 1);
-    await db("users").where({ id: session.userId }).increment("following_count", 1);
+    await db("users").where({ id: userId }).increment("following_count", 1);
 
     return NextResponse.json({ following: true });
   } catch (err) {
@@ -37,12 +34,12 @@ export async function POST(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ handle: string }> },
 ) {
   try {
-    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
-    if (!session.userId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+    const userId = await resolveUserId(req);
+    if (!userId) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
     const { handle } = await params;
 
@@ -50,12 +47,12 @@ export async function DELETE(
     if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const deleted = await db("follows")
-      .where({ follower_id: session.userId, following_id: target.id })
+      .where({ follower_id: userId, following_id: target.id })
       .delete();
 
     if (deleted > 0) {
       await db("users").where({ id: target.id }).decrement("followers_count", 1);
-      await db("users").where({ id: session.userId }).decrement("following_count", 1);
+      await db("users").where({ id: userId }).decrement("following_count", 1);
     }
 
     return NextResponse.json({ following: false });
@@ -67,19 +64,19 @@ export async function DELETE(
 
 /** GET — check if the current user follows this handle */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ handle: string }> },
 ) {
   try {
-    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
-    if (!session.userId) return NextResponse.json({ following: false });
+    const userId = await resolveUserId(req);
+    if (!userId) return NextResponse.json({ following: false });
 
     const { handle } = await params;
     const target = await db("users").where({ handle }).first();
     if (!target) return NextResponse.json({ following: false });
 
     const row = await db("follows")
-      .where({ follower_id: session.userId, following_id: target.id })
+      .where({ follower_id: userId, following_id: target.id })
       .first();
 
     return NextResponse.json({ following: !!row });

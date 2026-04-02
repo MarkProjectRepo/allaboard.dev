@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
-import { getIronSession } from "iron-session";
-import { cookies } from "next/headers";
 import db from "@/lib/server/db";
-import { sessionOptions, type SessionData } from "@/lib/server/session";
+import { resolveUserId } from "@/lib/server/resolveUserId";
 import { ALL_GRADES } from "@/lib/utils";
 
 function toClimb(row: Record<string, unknown>, videos: Record<string, unknown>[]) {
@@ -121,8 +119,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
-  if (!session.userId) {
+  const userId = await resolveUserId(req);
+  if (!userId) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }
 
@@ -166,7 +164,7 @@ export async function POST(req: NextRequest) {
       board_id:    boardId,
       angle:       resolvedAngle,
       description: description?.trim() ?? "",
-      author:      session.userId,
+      author:      userId,
       setter:      setter?.trim() || null,
       sends:       0,
     });

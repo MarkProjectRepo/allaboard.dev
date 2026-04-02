@@ -45,6 +45,8 @@ export default function UserProfilePage() {
   const [following, setFollowing] = useState<User[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [showToken, setShowToken] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   useEffect(() => {
     if (!handle) return;
@@ -344,6 +346,43 @@ export default function UserProfilePage() {
           )
         )}
       </section>
+
+      {/* API token — own profile only, placed last as a developer/power-user feature */}
+      {isOwn && profileUser.apiToken && (
+        <section className="mt-8 pb-8">
+          <h2 className="text-orange-400 font-semibold text-lg mb-3">API Token</h2>
+          <div className="bg-stone-800 border border-stone-700 rounded-xl p-4 space-y-3">
+            <p className="text-amber-400 text-xs leading-relaxed">
+              ⚠ Do not share your API token — it grants full access to your account.
+              Use it to authenticate API requests via the <code className="font-mono bg-stone-700 px-1 rounded">token=</code> query parameter.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type={showToken ? "text" : "password"}
+                value={profileUser.apiToken}
+                readOnly
+                className="flex-1 min-w-0 bg-stone-900 border border-stone-700 rounded-lg px-3 py-2 text-sm font-mono text-stone-300 focus:outline-none select-all"
+              />
+              <button
+                onClick={() => setShowToken((v) => !v)}
+                className="shrink-0 px-3 py-2 bg-stone-700 hover:bg-stone-600 text-stone-300 text-xs rounded-lg transition-colors"
+              >
+                {showToken ? "Hide" : "Show"}
+              </button>
+              <button
+                onClick={() => {
+                  void navigator.clipboard.writeText(profileUser.apiToken!);
+                  setTokenCopied(true);
+                  setTimeout(() => setTokenCopied(false), 2000);
+                }}
+                className="shrink-0 px-3 py-2 bg-orange-500 hover:bg-orange-400 text-white text-xs rounded-lg transition-colors"
+              >
+                {tokenCopied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

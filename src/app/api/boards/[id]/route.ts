@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getIronSession } from "iron-session";
-import { cookies } from "next/headers";
 import db from "@/lib/server/db";
-import { sessionOptions, type SessionData } from "@/lib/server/session";
+import { resolveUserId } from "@/lib/server/resolveUserId";
 import { toBoard } from "../route";
 
 export async function PATCH(
@@ -10,15 +8,15 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
-    if (!session.userId) {
+    const userId = await resolveUserId(req);
+    if (!userId) {
       return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     }
 
     const { id } = await params;
     const board = await db("boards").where({ id }).first();
     if (!board) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if (board.created_by !== session.userId) {
+    if (board.created_by !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
