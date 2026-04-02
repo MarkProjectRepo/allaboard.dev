@@ -435,21 +435,41 @@ interface FeedActivity { id, user, climb, date, attempts, sent, notes }
 
 ## Penetration Testing
 
+### Scripts
+
+Two scripts in `scripts/` automate the pen test workflow:
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/mint-session.mjs` | Mints a valid iron-session cookie for a given `userId` — used to authenticate curl requests without a real Google login |
+| `scripts/pentest.sh` | Runs a full live pen test against the running dev server: CORS rejection, 401 (unauth), 403 (non-owner), and 2xx (owner) for every protected resource |
+
 ### How to run a pen test
 
-The dev server must be running (`npm run dev`). Tests are made with `curl` against `http://localhost:3000`.
+1. Start the dev server: `npm run dev`
+2. Run the automated script:
 
-**ACL rules to verify for every protected endpoint:**
-1. Unauthenticated request (no cookie) → must return **401**
-2. Authenticated request by a non-owner → must return **403**
-3. Authenticated request by the owner → must succeed (**200/201**)
-
-**Quick unauthenticated check pattern:**
 ```bash
-# Should return 401
-curl -s -o /dev/null -w "%{http_code}" -X PATCH http://localhost:3000/api/users/somehandle \
-  -H "Content-Type: application/json" -d '{"bio":"hacked"}'
+OWNER_HANDLE=yourhandle NONOWNER_HANDLE=otherhandle bash scripts/pentest.sh
 ```
+
+`SESSION_SECRET` is read from the environment; if unset the dev default is used (matches what `npm run dev` uses when `SESSION_SECRET` is not in `.env.local`).
+
+The script covers:
+1. **No `Origin` header** → must return **403** (CORS rejection — blocks curl, arbitrary domains)
+2. **Unauthenticated** (no cookie) → must return **401**
+3. **Authenticated as non-owner** → must return **403**
+4. **Authenticated as owner** → must succeed (**200/201**)
+5. **Auth redirect routes** (`/api/auth/google`, `/api/auth/callback`, `/api/health`) → reachable without `Origin` (browser navigations)
+
+**Minting a cookie manually** (for one-off curl requests):
+```bash
+COOKIE=$(node scripts/mint-session.mjs yourhandle)
+curl -H "Cookie: $COOKIE" -H "Origin: http://localhost:3000" \
+     http://localhost:3000/api/auth/me
+```
+
+> **Note:** All API requests must include `Origin: http://localhost:3000` (or an allowed production origin). Requests without a recognised `Origin` are rejected with 403 by the CORS middleware before they reach the route handler.
 
 **Protected resources and their owner columns:**
 | Resource | Mutation endpoints | Owner check |
@@ -475,6 +495,7 @@ Run a pen test after any of the following:
 - A new API endpoint is added
 - An existing endpoint gains a new mutation method (POST/PATCH/DELETE)
 - Auth or session logic changes
+- CORS or middleware configuration changes
 
 ---
 
