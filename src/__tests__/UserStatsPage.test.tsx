@@ -225,6 +225,61 @@ describe("UserStatsPage — board selector", () => {
   });
 });
 
+// ── Sends granularity toggle ─────────────────────────────────────────────────
+
+describe("UserStatsPage — sends granularity toggle", () => {
+  it("does not render the Day/Week toggle when there are no ticks", async () => {
+    render(<UserStatsPage />);
+    await screen.findByText("Detailed Stats for @alice");
+    expect(screen.queryByRole("button", { name: "Week" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Day" })).not.toBeInTheDocument();
+  });
+
+  it("renders both Day and Week toggle buttons when ticks exist", async () => {
+    mockGetUserTicks.mockResolvedValue([makeTick()]);
+    render(<UserStatsPage />);
+    await screen.findByText("Sends");
+    expect(screen.getByRole("button", { name: "Week" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Day" })).toBeInTheDocument();
+  });
+
+  it("defaults to Week granularity — Week button carries the active style", async () => {
+    mockGetUserTicks.mockResolvedValue([makeTick()]);
+    render(<UserStatsPage />);
+    await screen.findByText("Sends");
+    expect(screen.getByRole("button", { name: "Week" })).toHaveClass("bg-stone-700");
+    expect(screen.getByRole("button", { name: "Day" })).not.toHaveClass("bg-stone-700");
+  });
+
+  it("activates Day mode and deactivates Week when Day is clicked", async () => {
+    mockGetUserTicks.mockResolvedValue([makeTick()]);
+    render(<UserStatsPage />);
+    await screen.findByText("Sends");
+    fireEvent.click(screen.getByRole("button", { name: "Day" }));
+    expect(screen.getByRole("button", { name: "Day" })).toHaveClass("bg-stone-700");
+    expect(screen.getByRole("button", { name: "Week" })).not.toHaveClass("bg-stone-700");
+  });
+
+  it("re-activates Week mode when Week is clicked after switching to Day", async () => {
+    mockGetUserTicks.mockResolvedValue([makeTick()]);
+    render(<UserStatsPage />);
+    await screen.findByText("Sends");
+    fireEvent.click(screen.getByRole("button", { name: "Day" }));
+    fireEvent.click(screen.getByRole("button", { name: "Week" }));
+    expect(screen.getByRole("button", { name: "Week" })).toHaveClass("bg-stone-700");
+    expect(screen.getByRole("button", { name: "Day" })).not.toHaveClass("bg-stone-700");
+  });
+
+  it("only shows one toggle — the Grade Pyramid filter row has no Day/Week buttons", async () => {
+    mockGetUserTicks.mockResolvedValue([makeTick()]);
+    render(<UserStatsPage />);
+    await screen.findByText("Grade Pyramid");
+    // There is exactly one "Week" button and one "Day" button in the whole page.
+    expect(screen.getAllByRole("button", { name: "Week" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Day" })).toHaveLength(1);
+  });
+});
+
 // ── Date range clamping ───────────────────────────────────────────────────────
 
 describe("UserStatsPage — date range clamping (max 3 years)", () => {

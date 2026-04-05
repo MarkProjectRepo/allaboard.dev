@@ -170,24 +170,42 @@ function allDatesInRange(dateFrom: string, dateTo: string): string[] {
   return dates;
 }
 
+/**
+ * Returns the Monday YYYY-MM-DD for each week that overlaps [dateFrom, dateTo],
+ * starting from the Monday of the week containing dateFrom.
+ */
+function allWeeksInRange(dateFrom: string, dateTo: string): string[] {
+  const weeks: string[] = [];
+  const cursor = new Date(weekMonday(dateFrom) + "T00:00:00");
+  const end    = new Date(dateTo + "T00:00:00");
+  while (cursor <= end) {
+    weeks.push(localDateStr(cursor));
+    cursor.setDate(cursor.getDate() + 7);
+  }
+  return weeks;
+}
+
 function buildHeatmapOption(
-  ticks: UserTick[], dateFrom: string, dateTo: string, isMobile = false,
+  ticks: UserTick[], dateFrom: string, dateTo: string, isMobile = false, granularity: "day" | "week" = "day",
 ): { option: EChartsOption; sundays: string[]; dates: string[] } {
+  const isWeekly = granularity === "week";
+
   const countMap = new Map<string, number>();
   const ticksByCell = new Map<string, UserTick[]>();
   for (const tick of ticks) {
     if (!tick.sent) continue;
-    const key = `${tickLocalDate(tick.date)}|${tick.grade}`;
+    const dateKey = isWeekly ? weekMonday(tickLocalDate(tick.date)) : tickLocalDate(tick.date);
+    const key = `${dateKey}|${tick.grade}`;
     countMap.set(key, (countMap.get(key) ?? 0) + 1);
     if (!ticksByCell.has(key)) ticksByCell.set(key, []);
     ticksByCell.get(key)!.push(tick);
   }
 
-  const dates = allDatesInRange(dateFrom, dateTo);
+  const dates = isWeekly ? allWeeksInRange(dateFrom, dateTo) : allDatesInRange(dateFrom, dateTo);
   const grades = ALL_GRADES;
 
-  // One vertical rule per Sunday so week boundaries are visible.
-  const sundays = dates.filter((d) => new Date(d + "T00:00:00").getDay() === 0);
+  // One vertical rule per Sunday so week boundaries are visible (day mode only).
+  const sundays = isWeekly ? [] : dates.filter((d) => new Date(d + "T00:00:00").getDay() === 0);
 
   // Compute maxCount from ticked cells only (used for opacity scaling).
   let maxCount = 1;
@@ -242,7 +260,18 @@ function buildHeatmapOption(
     xAxis: {
       type: "category",
       data: dates,
-      axisLabel: { color: "#a8a29e", fontSize: isMobile ? 9 : 10, rotate: 45, interval: "auto" },
+      axisLabel: {
+        color: "#a8a29e",
+        fontSize: isMobile ? 9 : 10,
+        rotate: 45,
+        interval: "auto",
+        ...(isWeekly && {
+          formatter: (value: string) => {
+            const d = new Date(value + "T00:00:00");
+            return d.toLocaleString("en-US", { month: "short", day: "numeric" });
+          },
+        }),
+      },
       axisLine: { lineStyle: { color: "#44403c" } },
       splitLine: { show: false },
     },
@@ -495,10 +524,14 @@ function ChartFilters({
   allBoards,
   filter,
   onChange,
+  granularity,
+  onGranularityChange,
 }: {
   allBoards: string[];
   filter: ChartFilter;
   onChange: (f: ChartFilter) => void;
+  granularity?: "day" | "week";
+  onGranularityChange?: (g: "day" | "week") => void;
 }) {
   const earliestAllowed = (() => {
     const d = new Date(filter.dateTo + "T00:00:00");
@@ -535,6 +568,23 @@ function ChartFilters({
           selected={filter.boards}
           onChange={(boards) => onChange({ ...filter, boards })}
         />
+      )}
+      {granularity !== undefined && onGranularityChange && (
+        <div className="flex rounded-lg border border-stone-700 overflow-hidden ml-auto">
+          {(["day", "week"] as const).map((g) => (
+            <button
+              key={g}
+              onClick={() => onGranularityChange(g)}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                granularity === g
+                  ? "bg-stone-700 text-white"
+                  : "text-stone-400 hover:text-stone-200 hover:bg-stone-800"
+              }`}
+            >
+              {g === "day" ? "Day" : "Week"}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -587,8 +637,9 @@ export default function UserStatsPage() {
 
   const [ticks, setTicks] = useState<UserTick[]>([]);
   const [isMobile, setIsMobile] = useState(isMobileScreen);
-  const [heatmapFilter, setHeatmapFilter] = useState<ChartFilter>(() => makeDefaultFilter(isMobileScreen() ? 1 : 3));
-  const [pyramidFilter, setPyramidFilter] = useState<ChartFilter>(() => makeDefaultFilter(isMobileScreen() ? 1 : 3));
+  const [heatmapFilter, setHeatmapFilter] = useState<ChartFilter>(() => makeDefaultFilter(6));
+  const [pyramidFilter, setPyramidFilter] = useState<ChartFilter>(() => makeDefaultFilter(6));
+  const [granularity, setGranularity] = useState<"day" | "week">("week");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -616,8 +667,8 @@ export default function UserStatsPage() {
   const pyramidTicks = useMemo(() => applyFilter(ticks, pyramidFilter), [ticks, pyramidFilter]);
 
   const { option: heatmapOption, sundays: heatmapSundays, dates: heatmapDates } = useMemo(
-    () => buildHeatmapOption(heatmapTicks, heatmapFilter.dateFrom, heatmapFilter.dateTo, isMobile),
-    [heatmapTicks, heatmapFilter.dateFrom, heatmapFilter.dateTo, isMobile],
+    () => buildHeatmapOption(heatmapTicks, heatmapFilter.dateFrom, heatmapFilter.dateTo, isMobile, granularity),
+    [heatmapTicks, heatmapFilter.dateFrom, heatmapFilter.dateTo, isMobile, granularity],
   );
 
   // Refs so the onReady callback can always read the latest sundays/dates
@@ -633,7 +684,11 @@ export default function UserStatsPage() {
   const drawSundayLines = useCallback(function drawSundayLines(chart: any) {
     const sundays = heatmapSundaysRef.current;
     const dates   = heatmapDatesRef.current;
-    if (!sundays.length) return;
+    // Week mode (or no sundays): clear any previously drawn lines and exit.
+    if (!sundays.length) {
+      chart.setOption({ graphic: [] });
+      return;
+    }
 
     // Pixel centre of each category via the axis' own coordinate system —
     // the midpoint of adjacent centres is the exact cell-boundary pixel.
@@ -714,7 +769,13 @@ export default function UserStatsPage() {
           <section className="mb-10">
             <h2 className="text-orange-400 font-semibold text-lg mb-1">Sends</h2>
             <p className="text-stone-500 text-sm mb-3">More, more!</p>
-            <ChartFilters allBoards={allBoards} filter={heatmapFilter} onChange={setHeatmapFilter} />
+            <ChartFilters
+              allBoards={allBoards}
+              filter={heatmapFilter}
+              onChange={setHeatmapFilter}
+              granularity={granularity}
+              onGranularityChange={setGranularity}
+            />
             <div className="bg-stone-900 border border-stone-700 rounded-xl p-5">
               <EChart option={heatmapOption} height={heatmapHeight} onReady={drawSundayLines} />
             </div>
