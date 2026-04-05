@@ -9,6 +9,7 @@ import {
   checkFollowing,
   followUser,
   unfollowUser,
+  importAuroraData,
 } from "@/lib/db";
 import type { User } from "@/lib/types";
 
@@ -27,6 +28,7 @@ const mockGetFollowing = jest.mocked(getFollowing);
 const mockCheckFollowing = jest.mocked(checkFollowing);
 const mockFollowUser = jest.mocked(followUser);
 const mockUnfollowUser = jest.mocked(unfollowUser);
+const mockImportAuroraData = jest.mocked(importAuroraData);
 
 const targetUser: User = {
   id: "targetuser",
@@ -205,5 +207,164 @@ describe("UserProfilePage — followers list", () => {
     await screen.findByText("@targetuser");
     fireEvent.click(screen.getByText("Followers (12)"));
     expect(screen.getByText("No followers yet.")).toBeInTheDocument();
+  });
+});
+
+// ── Aurora import section ─────────────────────────────────────────────────────
+
+/** Returns the hidden file input inside the Aurora import label. */
+function getFileInput(): HTMLInputElement {
+  // The label's text content is "Choose JSON file"; the hidden input is inside it.
+  return screen
+    .getByText(/choose json file/i)
+    .querySelector("input[type='file']")! as HTMLInputElement;
+}
+
+/**
+ * Simulate selecting a file in jsdom.  jsdom does not implement Blob/File.text(),
+ * so we stub the input's `files` property with a plain object that provides
+ * the text() method, then fire the change event.
+ */
+function selectFile(input: HTMLInputElement, content: string, name = "aurora.json") {
+  const mockFile = { text: () => Promise.resolve(content), name, type: "application/json" };
+  Object.defineProperty(input, "files", { value: [mockFile], configurable: true });
+  fireEvent.change(input);
+}
+
+describe("UserProfilePage — Aurora import section", () => {
+  const auroraJson = JSON.stringify({ ascents: [{ climb: "Test", angle: 40, grade: "7a" }] });
+
+  beforeEach(() => {
+    mockImportAuroraData.mockReset();
+    // Own profile so the import section renders
+    mockUseAuth.mockReturnValue({
+      user: targetUser,
+      loading: false,
+      logout: jest.fn(),
+      updateUser: jest.fn(),
+    });
+  });
+
+  it("renders the Import Data section on the owner's profile", async () => {
+    render(<UserProfilePage />);
+    expect(await screen.findByText("Import Data")).toBeInTheDocument();
+    expect(screen.getByText("Upload Aurora Kilter Data")).toBeInTheDocument();
+  });
+
+  it("does not render the Import Data section on another user's profile", async () => {
+    mockUseAuth.mockReturnValue({
+      user: otherUser,
+      loading: false,
+      logout: jest.fn(),
+      updateUser: jest.fn(),
+    });
+    render(<UserProfilePage />);
+    await screen.findByText("@targetuser");
+    expect(screen.queryByText("Import Data")).not.toBeInTheDocument();
+  });
+
+  it("shows 'Import complete' and all three stat rows after a successful import", async () => {
+    // Use values where no top-level count collides with a breakdown sub-count.
+    mockImportAuroraData.mockResolvedValue({
+      imported: 7, climbsCreated: 3, skipped: 0,
+      skipDetails: { alreadyImported: 0, unknownGrade: 0, missingName: 0, invalidAngle: 0 },
+    });
+
+    render(<UserProfilePage />);
+    await screen.findByText("Import Data");
+    selectFile(getFileInput(), auroraJson);
+
+    expect(await screen.findByText("Import complete")).toBeInTheDocument();
+    expect(screen.getByText("Ticks added")).toBeInTheDocument();
+    expect(screen.getByText("Climbs created")).toBeInTheDocument();
+    expect(screen.getByText("Ticks skipped")).toBeInTheDocument();
+  });
+
+  it("shows all stat rows even when counts are zero", async () => {
+    mockImportAuroraData.mockResolvedValue({
+      imported: 0, climbsCreated: 0, skipped: 3,
+      skipDetails: { alreadyImported: 3, unknownGrade: 0, missingName: 0, invalidAngle: 0 },
+    });
+
+    render(<UserProfilePage />);
+    await screen.findByText("Import Data");
+    selectFile(getFileInput(), auroraJson);
+
+    await screen.findByText("Import complete");
+    // All three rows always rendered regardless of zero values
+    expect(screen.getByText("Ticks added")).toBeInTheDocument();
+    expect(screen.getByText("Climbs created")).toBeInTheDocument();
+    expect(screen.getByText("Ticks skipped")).toBeInTheDocument();
+  });
+
+  it("shows an error message when the import API call fails", async () => {
+    mockImportAuroraData.mockRejectedValue(new Error("network error"));
+
+    render(<UserProfilePage />);
+    await screen.findByText("Import Data");
+    selectFile(getFileInput(), auroraJson);
+
+    expect(await screen.findByText("Import failed. Please try again.")).toBeInTheDocument();
+    expect(screen.queryByText("Import complete")).not.toBeInTheDocument();
+  });
+
+  it("shows a parse error when the selected file contains invalid JSON", async () => {
+    render(<UserProfilePage />);
+    await screen.findByText("Import Data");
+    selectFile(getFileInput(), "not valid json {{{");
+
+    expect(
+      await screen.findByText("Could not parse file — make sure it is valid JSON.")
+    ).toBeInTheDocument();
+    expect(mockImportAuroraData).not.toHaveBeenCalled();
+  });
+
+  it("calls importAuroraData with the profile handle and parsed file contents", async () => {
+    mockImportAuroraData.mockResolvedValue({
+      imported: 1, climbsCreated: 0, skipped: 0,
+      skipDetails: { alreadyImported: 0, unknownGrade: 0, missingName: 0, invalidAngle: 0 },
+    });
+
+    render(<UserProfilePage />);
+    await screen.findByText("Import Data");
+
+    const payload = { ascents: [{ climb: "Test", angle: 40, grade: "7a" }] };
+    selectFile(getFileInput(), JSON.stringify(payload));
+
+    await screen.findByText("Import complete");
+    expect(mockImportAuroraData).toHaveBeenCalledWith("targetuser", payload);
+  });
+
+  it("shows skip reason breakdown rows for each non-zero reason", async () => {
+    mockImportAuroraData.mockResolvedValue({
+      imported: 1, climbsCreated: 0, skipped: 4,
+      skipDetails: { alreadyImported: 2, unknownGrade: 1, missingName: 1, invalidAngle: 0 },
+    });
+
+    render(<UserProfilePage />);
+    await screen.findByText("Import Data");
+    selectFile(getFileInput(), auroraJson);
+
+    await screen.findByText("Import complete");
+    expect(screen.getByText("Already imported (same climb, same day)")).toBeInTheDocument();
+    expect(screen.getByText("Unrecognised Font grade")).toBeInTheDocument();
+    expect(screen.getByText("Missing climb name")).toBeInTheDocument();
+    // invalidAngle is 0, so its row should NOT appear
+    expect(screen.queryByText("Invalid angle")).not.toBeInTheDocument();
+  });
+
+  it("shows no skip breakdown when skipped is zero", async () => {
+    mockImportAuroraData.mockResolvedValue({
+      imported: 3, climbsCreated: 1, skipped: 0,
+      skipDetails: { alreadyImported: 0, unknownGrade: 0, missingName: 0, invalidAngle: 0 },
+    });
+
+    render(<UserProfilePage />);
+    await screen.findByText("Import Data");
+    selectFile(getFileInput(), auroraJson);
+
+    await screen.findByText("Import complete");
+    expect(screen.queryByText("Already imported (same climb, same day)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Unrecognised Font grade")).not.toBeInTheDocument();
   });
 });

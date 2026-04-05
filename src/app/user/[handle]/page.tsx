@@ -13,6 +13,8 @@ import {
   checkFollowing,
   followUser,
   unfollowUser,
+  importAuroraData,
+  type AuroraImportResult,
 } from "@/lib/db";
 import { useAuth } from "@/lib/auth-context";
 import { ALL_GRADES, timeAgo } from "@/lib/utils";
@@ -365,6 +367,11 @@ export default function UserProfilePage() {
         })()}
       </section>
 
+      {/* Import Data — own profile only */}
+      {isOwn && (
+        <AuroraImportSection handle={profileUser.handle} onSuccess={reload} />
+      )}
+
       {/* API token — own profile only, placed last as a developer/power-user feature */}
       {isOwn && profileUser.apiToken && (
         <section className="mt-8 pb-8">
@@ -608,5 +615,132 @@ function TickCard({
         </div>
       </div>
     </div>
+  );
+}
+
+function AuroraImportSection({
+  handle,
+  onSuccess,
+}: {
+  handle: string;
+  onSuccess: () => void;
+}) {
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState<AuroraImportResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setResult(null);
+    setError(null);
+    setImporting(true);
+
+    try {
+      const text = await file.text();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        setError("Could not parse file — make sure it is valid JSON.");
+        return;
+      }
+
+      const res = await importAuroraData(handle, parsed);
+      setResult(res);
+      onSuccess();
+    } catch {
+      setError("Import failed. Please try again.");
+    } finally {
+      setImporting(false);
+      // Reset so the same file can be re-selected after fixing an error
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  return (
+    <section className="mt-8 pb-2">
+      <h2 className="text-orange-400 font-semibold text-lg mb-3">Import Data</h2>
+      <div className="bg-stone-800 border border-stone-700 rounded-xl p-4 space-y-3">
+        <div>
+          <p className="text-stone-300 text-sm font-medium">Upload Aurora Kilter Data</p>
+          <p className="text-stone-400 text-xs mt-1 leading-relaxed">
+            Upload your personal data export from the Aurora application to import
+            your ticks and climbs. New climbs will be created on the Kilter Board
+            (Original) if they don&apos;t already exist.
+          </p>
+        </div>
+
+        <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+          importing
+            ? "bg-stone-700 text-stone-500 cursor-not-allowed"
+            : "bg-orange-500 hover:bg-orange-400 text-white"
+        }`}>
+          {importing ? "Importing…" : "Choose JSON file"}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="sr-only"
+            disabled={importing}
+            onChange={handleFile}
+          />
+        </label>
+
+        {result && (
+          <div className="bg-stone-900 border border-stone-700 rounded-lg px-4 py-3 text-sm">
+            <p className="text-green-400 font-medium mb-2">Import complete</p>
+            <dl className="space-y-1">
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-stone-400">Ticks added</dt>
+                <dd className="text-white font-semibold">{result.imported}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-stone-400">Climbs created</dt>
+                <dd className="text-white font-semibold">{result.climbsCreated}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <dt className="text-stone-400">Ticks skipped</dt>
+                <dd className="text-stone-500">{result.skipped}</dd>
+              </div>
+              {result.skipped > 0 && (
+                <div className="pt-1 mt-1 border-t border-stone-800 space-y-1">
+                  {result.skipDetails.alreadyImported > 0 && (
+                    <div className="flex items-center justify-between gap-4 pl-3">
+                      <dt className="text-stone-500 text-xs">Already imported (same climb, same day)</dt>
+                      <dd className="text-stone-500 text-xs">{result.skipDetails.alreadyImported}</dd>
+                    </div>
+                  )}
+                  {result.skipDetails.unknownGrade > 0 && (
+                    <div className="flex items-center justify-between gap-4 pl-3">
+                      <dt className="text-stone-500 text-xs">Unrecognised Font grade</dt>
+                      <dd className="text-stone-500 text-xs">{result.skipDetails.unknownGrade}</dd>
+                    </div>
+                  )}
+                  {result.skipDetails.missingName > 0 && (
+                    <div className="flex items-center justify-between gap-4 pl-3">
+                      <dt className="text-stone-500 text-xs">Missing climb name</dt>
+                      <dd className="text-stone-500 text-xs">{result.skipDetails.missingName}</dd>
+                    </div>
+                  )}
+                  {result.skipDetails.invalidAngle > 0 && (
+                    <div className="flex items-center justify-between gap-4 pl-3">
+                      <dt className="text-stone-500 text-xs">Invalid angle</dt>
+                      <dd className="text-stone-500 text-xs">{result.skipDetails.invalidAngle}</dd>
+                    </div>
+                  )}
+                </div>
+              )}
+            </dl>
+          </div>
+        )}
+
+        {error && (
+          <p className="text-red-400 text-sm">{error}</p>
+        )}
+      </div>
+    </section>
   );
 }

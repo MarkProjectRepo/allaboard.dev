@@ -214,3 +214,27 @@ export async function getFeedActivities(
 export async function computeStats(userId: string): Promise<ClimberStats> {
   return api<ClimberStats>(`/stats/${userId}`);
 }
+
+// ─── Imports ──────────────────────────────────────────────────────────────────
+
+export interface AuroraImportResult {
+  imported: number;
+  climbsCreated: number;
+  skipped: number;
+  skipDetails: {
+    missingName: number;
+    unknownGrade: number;
+    invalidAngle: number;
+    alreadyImported: number;
+  };
+}
+
+export async function importAuroraData(
+  handle: string,
+  data: unknown,
+): Promise<AuroraImportResult> {
+  return api<AuroraImportResult>(`/users/${encodeURIComponent(handle)}/import/aurora`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}

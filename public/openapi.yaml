@@ -747,6 +747,63 @@ paths:
           description: the handle does not exist.
         "500":
           description: database error.
+  /api/users/{handle}/import/aurora:
+    post:
+      summary: Import personal climbing data from an Aurora (Kilter Board) JSON export.
+      parameters:
+        - name: handle
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "``json { \"imported\": 5, \"climbsCreated\": 2, \"skipped\": 1 } ``"
+        "400":
+          description: the body is missing, not valid JSON, or has no ascents array.
+        "401":
+          description: not authenticated.
+        "403":
+          description: authenticated as a different user than handle.
+        "404":
+          description: the Kilter Board (Original) board is not found.
+        "500":
+          description: database error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - climb
+                - angle
+                - grade
+              properties:
+                climb:
+                  type: string
+                  description: climb name.
+                angle:
+                  type: string
+                  description: wall angle in degrees.
+                grade:
+                  type: string
+                  description: Font-scale grade string (e.g. "7a").
+                count:
+                  type: string
+                  description: number of attempts.
+                stars:
+                  type: string
+                  description: star rating (0–3); mapped to 1–4 internally.
+                climbed_at:
+                  type: string
+                  description: ISO date/timestamp of the ascent.
+                comment:
+                  type: string
+                  description: free-form notes.
+      security:
+        - apiKeyAuth: []
+        - cookieAuth: []
   /api/users/{handle}:
     get:
       summary: Fetch a user's public profile by handle.
