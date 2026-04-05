@@ -45,7 +45,10 @@ import db from "@/lib/server/db";
  */
 export async function GET(req: NextRequest) {
   try {
-    const userId = req.nextUrl.searchParams.get("userId");
+    const { searchParams } = req.nextUrl;
+    const followingOf = searchParams.get("followingOf"); // show self + followees only
+    const limit  = Math.min(Number(searchParams.get("limit")  ?? 25), 100);
+    const offset = Math.max(Number(searchParams.get("offset") ?? 0),  0);
 
     const query = db("ticks as t")
       .join("climbs as c", "t.climb_id", "c.id")
@@ -53,7 +56,8 @@ export async function GET(req: NextRequest) {
       .leftJoin("boards as b", "c.board_id", "b.id")
       .orderBy("t.date", "desc")
       .orderBy("t.created_at", "desc")
-      .limit(50)
+      .limit(limit + 1)   // fetch one extra to determine hasMore
+      .offset(offset)
       .select(
         "t.id", "t.date", "t.sent", "t.rating", "t.comment", "t.suggested_grade", "t.instagram_url", "t.attempts",
         "c.id as climb_id", "c.name as climb_name", "c.grade",
@@ -67,9 +71,18 @@ export async function GET(req: NextRequest) {
         "u.personal_best_kilter", "u.personal_best_moonboard",
       );
 
-    if (userId) query.whereNot("t.user_id", userId);
+    if (followingOf) {
+      query.where(function () {
+        this.where("t.user_id", followingOf).orWhereIn(
+          "t.user_id",
+          db("follows").select("following_id").where("follower_id", followingOf),
+        );
+      });
+    }
 
-    const rows = await query;
+    const rawRows = await query;
+    const hasMore = rawRows.length > limit;
+    const rows    = hasMore ? rawRows.slice(0, limit) : rawRows;
 
     const climbIds = [...new Set(rows.map((r) => r.climb_id))];
     const videos = climbIds.length
@@ -119,7 +132,7 @@ export async function GET(req: NextRequest) {
       },
     }));
 
-    return NextResponse.json(activities);
+    return NextResponse.json({ activities, hasMore });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Failed to fetch feed" }, { status: 500 });

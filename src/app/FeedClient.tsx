@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { FeedActivity } from "@/lib/types";
 import { getFeedActivities } from "@/lib/db";
 import { useAuth } from "@/lib/auth-context";
@@ -10,26 +10,67 @@ import StarRating from "@/components/StarRating";
 import UserAvatar from "@/components/UserAvatar";
 import Link from "next/link";
 
+const PAGE_SIZE = 25;
+
 type FeedTab = "all" | "following";
 
 export default function FeedClient() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<FeedTab>("all");
+  const [tab, setTab]             = useState<FeedTab>("following");
   const [activities, setActivities] = useState<FeedActivity[]>([]);
+  const [hasMore, setHasMore]     = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
 
-  const reload = useCallback(() => {
-    const userId = tab === "following" && user ? user.id : undefined;
-    void (async () => {
-      setActivities(await getFeedActivities(userId));
-    })();
-  }, [tab, user]);
+  // Ref-based lock prevents concurrent / duplicate fetches.
+  const loadingRef = useRef(false);
+  const offsetRef  = useRef(0);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  useEffect(reload, [reload]);
+  const fetchPage = useCallback(async (tab: FeedTab, offset: number, replace: boolean) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    try {
+      const followingOf = tab === "following" && user ? user.id : undefined;
+      const { activities: page, hasMore } = await getFeedActivities(followingOf, { limit: PAGE_SIZE, offset });
+      setActivities((prev) => replace ? page : [...prev, ...page]);
+      setHasMore(hasMore);
+      offsetRef.current = offset + page.length;
+    } finally {
+      loadingRef.current = false;
+      if (replace) setInitialLoading(false);
+    }
+  }, [user]);
 
-  // Reset to "all" if the user logs out while on the "following" tab
+  // Reset and reload when tab changes.
+  useEffect(() => {
+    offsetRef.current = 0;
+    loadingRef.current = false;
+    setActivities([]);
+    setHasMore(true);
+    setInitialLoading(true);
+    void fetchPage(tab, 0, true);
+  }, [tab, fetchPage]);
+
+  // Reset to "all" if the user logs out while on the "following" tab.
   useEffect(() => {
     if (!user && tab === "following") setTab("all");
   }, [user, tab]);
+
+  // IntersectionObserver watches the sentinel div at the bottom of the list.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
+          void fetchPage(tab, offsetRef.current, false);
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [tab, hasMore, fetchPage]);
 
   return (
     <>
@@ -46,7 +87,9 @@ export default function FeedClient() {
         </div>
       </div>
 
-      {activities.length === 0 ? (
+      {initialLoading ? (
+        <p className="text-stone-500 text-center py-16">Loading…</p>
+      ) : activities.length === 0 ? (
         <p className="text-stone-500 text-center py-16">No activity yet.</p>
       ) : (
         <div className="flex flex-col gap-4">
@@ -55,6 +98,13 @@ export default function FeedClient() {
           ))}
         </div>
       )}
+
+      {/* Sentinel — IntersectionObserver target; also shows a subtle loading indicator */}
+      <div ref={sentinelRef} className="py-6 flex justify-center">
+        {!initialLoading && hasMore && (
+          <span className="text-stone-600 text-xs">Loading more…</span>
+        )}
+      </div>
     </>
   );
 }
@@ -109,7 +159,7 @@ function ActivityCard({ activity }: { activity: FeedActivity }) {
               <span className="text-stone-400 text-sm">Working</span>
             )}
             <span className="text-stone-500 text-sm">—</span>
-            <span className="text-white text-sm font-medium">{climb.name}</span>
+            <Link href={`/climbs/${climb.id}`} className="text-white text-sm font-medium hover:text-orange-400 transition-colors">{climb.name}</Link>
             <GradeBadge grade={climb.grade} />
             {climb.boardName && (
               <span className="text-stone-500 text-xs">{climb.boardName}</span>
@@ -130,14 +180,8 @@ function ActivityCard({ activity }: { activity: FeedActivity }) {
             <p className="mt-2 text-stone-300 text-sm leading-relaxed">{comment}</p>
           )}
 
-          <div className="mt-3 flex items-center justify-between">
-            <Link
-              href={`/climbs/${climb.id}`}
-              className="text-xs text-stone-400 hover:text-white transition-colors cursor-pointer"
-            >
-              View climb →
-            </Link>
-            {instagramUrl && (
+          {instagramUrl && (
+            <div className="mt-3">
               <a
                 href={instagramUrl}
                 target="_blank"
@@ -151,8 +195,8 @@ function ActivityCard({ activity }: { activity: FeedActivity }) {
                 </div>
                 Watch video
               </a>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

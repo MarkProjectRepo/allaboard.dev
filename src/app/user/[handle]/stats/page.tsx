@@ -121,6 +121,7 @@ function buildHeatmapOption(ticks: UserTick[], dateFrom: string, dateTo: string,
   const countMap = new Map<string, number>();
   const ticksByCell = new Map<string, UserTick[]>();
   for (const tick of ticks) {
+    if (!tick.sent) continue;
     const key = `${tick.date.slice(0, 10)}|${tick.grade}`;
     countMap.set(key, (countMap.get(key) ?? 0) + 1);
     if (!ticksByCell.has(key)) ticksByCell.set(key, []);

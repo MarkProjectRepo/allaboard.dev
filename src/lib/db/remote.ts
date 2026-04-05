@@ -198,9 +198,15 @@ export async function logClimb({
 
 // ─── Feed ─────────────────────────────────────────────────────────────────────
 
-export async function getFeedActivities(userId?: string): Promise<FeedActivity[]> {
-  const qs = userId ? `?userId=${encodeURIComponent(userId)}` : "";
-  return api<FeedActivity[]>(`/feed${qs}`);
+export async function getFeedActivities(
+  followingOf?: string,
+  { limit = 25, offset = 0 }: { limit?: number; offset?: number } = {},
+): Promise<{ activities: FeedActivity[]; hasMore: boolean }> {
+  const params = new URLSearchParams();
+  if (followingOf) params.set("followingOf", followingOf);
+  params.set("limit",  String(limit));
+  params.set("offset", String(offset));
+  return api<{ activities: FeedActivity[]; hasMore: boolean }>(`/feed?${params.toString()}`);
 }
 
 // ─── Stats ────────────────────────────────────────────────────────────────────

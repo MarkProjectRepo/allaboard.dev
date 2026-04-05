@@ -7,6 +7,13 @@ import type { FeedActivity, User } from "@/lib/types";
 jest.mock("@/lib/auth-context");
 jest.mock("@/lib/db");
 
+// IntersectionObserver is not implemented in jsdom.
+global.IntersectionObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof IntersectionObserver;
+
 const mockUseAuth = jest.mocked(useAuth);
 const mockGetFeedActivities = jest.mocked(getFeedActivities);
 
@@ -62,7 +69,7 @@ const mockActivity: FeedActivity = {
 
 describe("FeedClient — tab visibility", () => {
   beforeEach(() => {
-    mockGetFeedActivities.mockResolvedValue([]);
+    mockGetFeedActivities.mockResolvedValue({ activities: [], hasMore: false });
   });
 
   it("always shows the 'All Activity' tab", async () => {
@@ -87,7 +94,7 @@ describe("FeedClient — tab visibility", () => {
 describe("FeedClient — activity cards", () => {
   beforeEach(() => {
     mockUseAuth.mockReturnValue({ user: null, loading: false, logout: jest.fn(), updateUser: jest.fn() });
-    mockGetFeedActivities.mockResolvedValue([mockActivity]);
+    mockGetFeedActivities.mockResolvedValue({ activities: [mockActivity], hasMore: false });
   });
 
   it("renders the climb name from the API response", async () => {
@@ -108,7 +115,7 @@ describe("FeedClient — activity cards", () => {
   });
 
   it("renders 'Working' for ticks where sent is false", async () => {
-    mockGetFeedActivities.mockResolvedValue([{ ...mockActivity, sent: false }]);
+    mockGetFeedActivities.mockResolvedValue({ activities: [{ ...mockActivity, sent: false }], hasMore: false });
     render(<FeedClient />);
     await screen.findByText("Working");
   });
@@ -119,7 +126,7 @@ describe("FeedClient — activity cards", () => {
   });
 
   it("shows 'No activity yet.' when the feed is empty", async () => {
-    mockGetFeedActivities.mockResolvedValue([]);
+    mockGetFeedActivities.mockResolvedValue({ activities: [], hasMore: false });
     render(<FeedClient />);
     expect(await screen.findByText("No activity yet.")).toBeInTheDocument();
   });
