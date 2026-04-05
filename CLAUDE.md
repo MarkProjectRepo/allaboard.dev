@@ -554,6 +554,44 @@ The generator extracts:
 
 ---
 
+## Grade Scales
+
+### V-scale (used internally)
+
+All grades stored in the database and displayed in the UI use the **V-scale** (`Grade` type in `src/lib/types.ts`). The canonical ordered list is `ALL_GRADES` in `src/lib/utils.ts`.
+
+### Font-scale conversion
+
+When importing or consuming external data that uses the Font scale (e.g. Kilter Board API, third-party logbooks), convert to V-scale using the table below. Some lower V-grades map from two Font grades — treat both as the same V-grade.
+
+| V-grade | Font grade(s) |
+|---------|--------------|
+| V0  | 4      |
+| V1  | 5      |
+| V2  | 5+     |
+| V3  | 6a, 6a+ |
+| V4  | 6b, 6b+ |
+| V5  | 6c     |
+| V5+ | 6c+    |
+| V6  | 7a     |
+| V7  | 7a+    |
+| V8  | 7b     |
+| V8+ | 7b+    |
+| V9  | 7c     |
+| V10 | 7c+    |
+| V11 | 8a     |
+| V12 | 8a+    |
+| V13 | 8b     |
+| V14 | 8b+    |
+| V15 | 8c     |
+| V16 | 8c+    |
+| V17 | 9a     |
+| V18 | 9a+    |
+
+Any import script or API integration that receives Font-scale grades must convert them to V-scale before writing to the database. The mapping is one-way for storage — always store V-scale.
+
+---
+
 ## Adding New Features — Common Patterns
 
 ### Add a new API endpoint
