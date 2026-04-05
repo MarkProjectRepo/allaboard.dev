@@ -29,7 +29,7 @@ export interface ClimbFilters {
   gradeMax?: string;
   angleMin?: number;
   angleMax?: number;
-  boardId?: string;
+  boardIds?: string[];
   sort?: string;
   limit?: number;
   offset?: number;
@@ -37,15 +37,15 @@ export interface ClimbFilters {
 
 export async function getClimbs(filters?: ClimbFilters): Promise<{ climbs: Climb[]; hasMore: boolean }> {
   const params = new URLSearchParams();
-  if (filters?.q)             params.set("q",        filters.q);
-  if (filters?.gradeMin)      params.set("gradeMin", filters.gradeMin);
-  if (filters?.gradeMax)      params.set("gradeMax", filters.gradeMax);
-  if (filters?.angleMin != null) params.set("angleMin", String(filters.angleMin));
-  if (filters?.angleMax != null) params.set("angleMax", String(filters.angleMax));
-  if (filters?.boardId)       params.set("boardId",  filters.boardId);
-  if (filters?.sort)          params.set("sort",     filters.sort);
-  if (filters?.limit  != null) params.set("limit",   String(filters.limit));
-  if (filters?.offset != null) params.set("offset",  String(filters.offset));
+  if (filters?.q)                        params.set("q",        filters.q);
+  if (filters?.gradeMin)                 params.set("gradeMin", filters.gradeMin);
+  if (filters?.gradeMax)                 params.set("gradeMax", filters.gradeMax);
+  if (filters?.angleMin != null)         params.set("angleMin", String(filters.angleMin));
+  if (filters?.angleMax != null)         params.set("angleMax", String(filters.angleMax));
+  if (filters?.boardIds?.length)         params.set("boardIds", filters.boardIds.join(","));
+  if (filters?.sort)                     params.set("sort",     filters.sort);
+  if (filters?.limit  != null)           params.set("limit",    String(filters.limit));
+  if (filters?.offset != null)           params.set("offset",   String(filters.offset));
   const qs = params.toString();
   return api<{ climbs: Climb[]; hasMore: boolean }>(`/climbs${qs ? `?${qs}` : ""}`);
 }

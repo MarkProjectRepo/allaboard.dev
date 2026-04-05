@@ -76,10 +76,9 @@ describe("UserProfilePage — profile display", () => {
     mockUseAuth.mockReturnValue({ user: null, loading: false, logout: jest.fn(), updateUser: jest.fn() });
   });
 
-  it("shows the user's display name and handle", async () => {
+  it("shows the user's handle as the page title", async () => {
     render(<UserProfilePage />);
-    expect(await screen.findByText("Target User")).toBeInTheDocument();
-    expect(screen.getByText("@targetuser")).toBeInTheDocument();
+    expect(await screen.findByText("@targetuser")).toBeInTheDocument();
   });
 
   it("shows the user's bio", async () => {
@@ -89,14 +88,14 @@ describe("UserProfilePage — profile display", () => {
 
   it("shows the followers count in the stat tiles", async () => {
     render(<UserProfilePage />);
-    await screen.findByText("Target User");
+    await screen.findByText("@targetuser");
     expect(screen.getByText("12")).toBeInTheDocument();
     expect(screen.getByText("Followers")).toBeInTheDocument();
   });
 
   it("renders Ticks, Followers, and Following tabs with counts", async () => {
     render(<UserProfilePage />);
-    await screen.findByText("Target User");
+    await screen.findByText("@targetuser");
     // Tab labels include counts — e.g. "Ticks (0)", "Followers (12)", "Following (5)"
     expect(screen.getByText("Ticks (0)")).toBeInTheDocument();
     expect(screen.getByText("Followers (12)")).toBeInTheDocument();
@@ -105,7 +104,7 @@ describe("UserProfilePage — profile display", () => {
 
   it("shows 'No ticks yet.' when the tick list is empty", async () => {
     render(<UserProfilePage />);
-    await screen.findByText("Target User");
+    await screen.findByText("@targetuser");
     expect(screen.getByText("No ticks yet.")).toBeInTheDocument();
   });
 });
@@ -118,7 +117,7 @@ describe("UserProfilePage — own profile", () => {
 
   it("does not show a Follow or Unfollow button on your own profile", async () => {
     render(<UserProfilePage />);
-    await screen.findByText("Target User");
+    await screen.findByText("@targetuser");
     expect(screen.queryByText("Follow")).not.toBeInTheDocument();
     expect(screen.queryByText("Unfollow")).not.toBeInTheDocument();
   });
@@ -131,7 +130,7 @@ describe("UserProfilePage — own profile", () => {
   it("shows an Unfollow button in the Following list on your own profile", async () => {
     mockGetFollowing.mockResolvedValue([otherUser]);
     render(<UserProfilePage />);
-    await screen.findByText("Target User");
+    await screen.findByText("@targetuser");
     fireEvent.click(screen.getByText("Following (5)"));
     expect(await screen.findByText("Unfollow")).toBeInTheDocument();
   });
@@ -139,7 +138,7 @@ describe("UserProfilePage — own profile", () => {
   it("removes a user from the Following list after clicking Unfollow", async () => {
     mockGetFollowing.mockResolvedValue([otherUser]);
     render(<UserProfilePage />);
-    await screen.findByText("Target User");
+    await screen.findByText("@targetuser");
     fireEvent.click(screen.getByText("Following (5)"));
     fireEvent.click(await screen.findByText("Unfollow"));
     await waitFor(() =>
@@ -166,10 +165,9 @@ describe("UserProfilePage — viewing another user's profile", () => {
     expect(await screen.findByText("Unfollow")).toBeInTheDocument();
   });
 
-  it("does not show the Detailed Stats link on another user's profile", async () => {
+  it("shows the Detailed Stats link on another user's profile", async () => {
     render(<UserProfilePage />);
-    await screen.findByText("Target User");
-    expect(screen.queryByText("Detailed Stats")).not.toBeInTheDocument();
+    expect(await screen.findByText("Detailed Stats")).toBeInTheDocument();
   });
 
   it("calls followUser and switches button to Unfollow when Follow is clicked", async () => {
@@ -197,14 +195,14 @@ describe("UserProfilePage — followers list", () => {
   it("shows followers after clicking the Followers tab", async () => {
     mockGetFollowers.mockResolvedValue([otherUser]);
     render(<UserProfilePage />);
-    await screen.findByText("Target User");
+    await screen.findByText("@targetuser");
     fireEvent.click(screen.getByText("Followers (12)"));
     expect(await screen.findByText("Other User")).toBeInTheDocument();
   });
 
   it("shows 'No followers yet.' when the list is empty", async () => {
     render(<UserProfilePage />);
-    await screen.findByText("Target User");
+    await screen.findByText("@targetuser");
     fireEvent.click(screen.getByText("Followers (12)"));
     expect(screen.getByText("No followers yet.")).toBeInTheDocument();
   });

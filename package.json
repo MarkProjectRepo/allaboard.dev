@@ -15,6 +15,7 @@
   "dependencies": {
     "@scalar/api-reference-react": "^0.9.18",
     "@sentry/nextjs": "^10.46.0",
+    "echarts": "^6.0.0",
     "iron-session": "^8.0.4",
     "knex": "^3.1.0",
     "next": "16.1.6",

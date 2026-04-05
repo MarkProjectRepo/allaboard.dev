@@ -26,13 +26,13 @@ export default function ClimbsPage() {
   const defaultApplied = useRef(false);
 
   // Filter state
-  const [query, setQuery]       = useState("");
-  const [gradeMin, setGradeMin] = useState<Grade | null>(null);
-  const [gradeMax, setGradeMax] = useState<Grade | null>(null);
-  const [boardId, setBoardId]   = useState<string>("");
-  const [angleMin, setAngleMin] = useState<string>("");
-  const [angleMax, setAngleMax] = useState<string>("");
-  const [sort, setSort]         = useState("sends_desc");
+  const [query, setQuery]         = useState("");
+  const [gradeMin, setGradeMin]   = useState<Grade | null>(null);
+  const [gradeMax, setGradeMax]   = useState<Grade | null>(null);
+  const [boardIds, setBoardIds]   = useState<string[]>([]);
+  const [angleMin, setAngleMin]   = useState<string>("");
+  const [angleMax, setAngleMax]   = useState<string>("");
+  const [sort, setSort]           = useState("sends_desc");
 
   // Dropdown open state
   const [sortOpen, setSortOpen]   = useState(false);
@@ -53,7 +53,7 @@ export default function ClimbsPage() {
         setBoards(loaded);
         if (!defaultApplied.current && user?.homeBoard) {
           const match = loaded.find((b) => b.name === user.homeBoard);
-          if (match) setBoardId(match.id);
+          if (match) setBoardIds([match.id]);
           defaultApplied.current = true;
         }
         setBoardsLoaded(true);
@@ -67,7 +67,7 @@ export default function ClimbsPage() {
     if (query)    f.q        = query;
     if (gradeMin) f.gradeMin = gradeMin;
     if (gradeMax) f.gradeMax = gradeMax;
-    if (boardId)  f.boardId  = boardId;
+    if (boardIds.length) f.boardIds = boardIds;
     if (angleMin) f.angleMin = Number(angleMin);
     if (angleMax) f.angleMax = Number(angleMax);
     if (sort)     f.sort     = sort;
@@ -88,7 +88,7 @@ export default function ClimbsPage() {
       .catch(() => { setClimbs([]); setHasMore(false); })
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, gradeMin, gradeMax, boardId, angleMin, angleMax, sort, boardsLoaded]);
+  }, [query, gradeMin, gradeMax, boardIds, angleMin, angleMax, sort, boardsLoaded]);
 
   // Load next page
   const loadMore = useCallback(() => {
@@ -103,7 +103,7 @@ export default function ClimbsPage() {
       .catch(() => {})
       .finally(() => setLoadingMore(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadingMore, hasMore, query, gradeMin, gradeMax, boardId, angleMin, angleMax, sort]);
+  }, [loadingMore, hasMore, query, gradeMin, gradeMax, boardIds, angleMin, angleMax, sort]);
 
   // IntersectionObserver on sentinel
   useEffect(() => {
@@ -166,8 +166,10 @@ export default function ClimbsPage() {
     !gradeMax ? gradeMin :
     `${gradeMin} – ${gradeMax}`;
 
-  const selectedBoard = boards.find((b) => b.id === boardId);
-  const boardLabel    = selectedBoard ? selectedBoard.name : "Board";
+  const boardLabel =
+    boardIds.length === 0 ? "Board" :
+    boardIds.length === 1 ? (boards.find((b) => b.id === boardIds[0])?.name ?? "Board") :
+    `${boardIds.length} boards`;
 
   const hasAngleFilter = angleMin !== "" || angleMax !== "";
   const angleLabel     = !hasAngleFilter ? "Angle" :
@@ -175,7 +177,7 @@ export default function ClimbsPage() {
     angleMin ? `≥${angleMin}°` : `≤${angleMax}°`;
 
   const hasGradeFilter = gradeMin !== null;
-  const hasBoardFilter = boardId !== "";
+  const hasBoardFilter = boardIds.length > 0;
 
   return (
     <div>
@@ -399,43 +401,41 @@ export default function ClimbsPage() {
             }`}
           >
             {boardLabel}
-            <svg className="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+            <svg
+              className={`w-3.5 h-3.5 opacity-70 transition-transform ${boardOpen ? "rotate-180" : ""}`}
+              fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"
+            >
               <path d="m6 9 6 6 6-6"/>
             </svg>
           </button>
 
           {boardOpen && (
-            <div className="absolute right-0 top-full mt-2 z-30 bg-stone-900 border border-stone-700 rounded-xl shadow-2xl p-2 min-w-[200px]">
-              <div className="flex items-center justify-between px-2 pt-1 pb-2">
-                <span className="text-white text-sm font-semibold">Board</span>
-                {hasBoardFilter && (
-                  <button
-                    onClick={() => setBoardId("")}
-                    className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
+            <div className="absolute right-0 top-full mt-2 z-30 bg-stone-800 border border-stone-700 rounded-lg shadow-2xl py-1 min-w-[200px]">
+              {/* "All boards" clears the selection */}
+              <label className="flex items-center gap-2.5 px-3 py-2 hover:bg-stone-700/60 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={boardIds.length === 0}
+                  onChange={() => setBoardIds([])}
+                  className="accent-orange-500 w-3.5 h-3.5"
+                />
+                <span className="text-sm text-stone-300">All boards</span>
+              </label>
+              <div className="my-1 border-t border-stone-700" />
               {boards.map((b) => (
-                <button
-                  key={b.id}
-                  onClick={() => { setBoardId(b.id === boardId ? "" : b.id); setBoardOpen(false); }}
-                  className={`w-full flex items-center gap-2.5 px-2 py-2.5 rounded-lg text-sm transition-colors text-left ${
-                    boardId === b.id ? "bg-stone-800 text-white" : "text-stone-300 hover:bg-stone-800"
-                  }`}
-                >
-                  <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                    boardId === b.id ? "bg-orange-500 border-orange-500" : "border-stone-600"
-                  }`}>
-                    {boardId === b.id && (
-                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                        <path d="M20 6 9 17l-5-5"/>
-                      </svg>
-                    )}
-                  </span>
-                  {b.name}
-                </button>
+                <label key={b.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-stone-700/60 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={boardIds.includes(b.id)}
+                    onChange={(e) =>
+                      setBoardIds(e.target.checked
+                        ? [...boardIds, b.id]
+                        : boardIds.filter((id) => id !== b.id))
+                    }
+                    className="accent-orange-500 w-3.5 h-3.5"
+                  />
+                  <span className="text-sm text-stone-300">{b.name}</span>
+                </label>
               ))}
             </div>
           )}

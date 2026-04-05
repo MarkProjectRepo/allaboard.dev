@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { Board, Grade, User, UserTick } from "@/lib/types";
 import {
@@ -41,6 +41,7 @@ export default function UserProfilePage() {
   } | null>(null);
 
   const [activeTab, setActiveTab] = useState<SocialTab>("ticks");
+  const [page, setPage] = useState(1);
   const [followers, setFollowers] = useState<User[]>([]);
   const [following, setFollowing] = useState<User[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -157,8 +158,7 @@ export default function UserProfilePage() {
         <div className="flex-1">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold text-white">{profileUser.displayName}</h1>
-              <p className="text-stone-400 text-sm mt-0.5">@{profileUser.handle}</p>
+              <h1 className="text-2xl font-bold text-white">@{profileUser.handle}</h1>
             </div>
             {!isOwn && currentUser && (
               <button
@@ -181,21 +181,17 @@ export default function UserProfilePage() {
             {isOwn && boards.length > 0 ? (
               <>
                 <span className="text-xs text-stone-500">Default board:</span>
-                <select
+                <BoardDropdown
+                  boards={boards}
                   value={boards.find((b) => b.name === profileUser.homeBoard)?.id ?? ""}
-                  onChange={async (e) => {
-                    const board = boards.find((b) => b.id === e.target.value);
+                  onChange={async (boardId) => {
+                    const board = boards.find((b) => b.id === boardId);
                     if (!board) return;
                     const updated = await updateCurrentUser(profileUser.id, { homeBoard: board.name });
                     setProfileUser(updated);
-                    if (isOwn) updateUser(updated);
+                    updateUser(updated);
                   }}
-                  className="bg-stone-800 border border-stone-700 rounded px-2 py-0.5 text-xs text-white focus:outline-none focus:border-orange-500 transition-colors cursor-pointer"
-                >
-                  {boards.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
+                />
               </>
             ) : (
               <span className="text-xs text-stone-500">Home board: {profileUser.homeBoard}</span>
@@ -247,11 +243,10 @@ export default function UserProfilePage() {
         </section>
       )}
 
-      {/* Detailed stats link — own profile only */}
-      {isOwn && (
-        <section className="mt-8">
+      {/* Detailed stats link — visible to everyone */}
+      <section className="mt-8">
           <Link
-            href="/stats"
+            href={`/user/${profileUser.handle}/stats`}
             className="flex items-center justify-between bg-stone-800 border border-stone-700 hover:border-stone-500 rounded-xl px-5 py-4 transition-colors"
           >
             <div>
@@ -262,15 +257,14 @@ export default function UserProfilePage() {
             </div>
             <span className="text-stone-400 text-lg">→</span>
           </Link>
-        </section>
-      )}
+      </section>
 
       {/* Tab nav */}
       <div className="mt-8 flex gap-1 border-b border-stone-800">
         {(["ticks", "followers", "following"] as SocialTab[]).map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => { setActiveTab(tab); setPage(1); }}
             className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
               activeTab === tab
                 ? "border-orange-500 text-orange-400"
@@ -288,63 +282,87 @@ export default function UserProfilePage() {
 
       {/* Tab content */}
       <section className="mt-4 pb-8">
-        {activeTab === "ticks" && (
-          ticks.length === 0 ? (
+        {activeTab === "ticks" && (() => {
+          const PAGE_SIZE = 10;
+          const pageItems = ticks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+          const totalPages = Math.ceil(ticks.length / PAGE_SIZE);
+          return ticks.length === 0 ? (
             <p className="text-stone-500 text-sm">No ticks yet.</p>
           ) : (
-            <div className="flex flex-col gap-3">
-              {ticks.map((tick) => (
-                <TickCard
-                  key={tick.id}
-                  tick={tick}
-                  canEdit={isOwn}
-                  onEdit={() =>
-                    setTickTarget({ climbId: tick.climbId, climbName: tick.climbName, tick, tickId: tick.id })
-                  }
-                  onDelete={async () => {
-                    await deleteTick(tick.id);
-                    reload();
-                  }}
-                />
-              ))}
-            </div>
-          )
-        )}
+            <>
+              <div className="flex flex-col gap-3">
+                {pageItems.map((tick) => (
+                  <TickCard
+                    key={tick.id}
+                    tick={tick}
+                    canEdit={isOwn}
+                    onEdit={() =>
+                      setTickTarget({ climbId: tick.climbId, climbName: tick.climbName, tick, tickId: tick.id })
+                    }
+                    onDelete={async () => {
+                      await deleteTick(tick.id);
+                      reload();
+                    }}
+                  />
+                ))}
+              </div>
+              {totalPages > 1 && (
+                <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+              )}
+            </>
+          );
+        })()}
 
-        {activeTab === "followers" && (
-          followers.length === 0 ? (
+        {activeTab === "followers" && (() => {
+          const PAGE_SIZE = 10;
+          const pageItems = followers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+          const totalPages = Math.ceil(followers.length / PAGE_SIZE);
+          return followers.length === 0 ? (
             <p className="text-stone-500 text-sm">No followers yet.</p>
           ) : (
-            <div className="flex flex-col gap-2">
-              {followers.map((u) => (
-                <UserRow key={u.id} user={u} />
-              ))}
-            </div>
-          )
-        )}
+            <>
+              <div className="flex flex-col gap-2">
+                {pageItems.map((u) => (
+                  <UserRow key={u.id} user={u} />
+                ))}
+              </div>
+              {totalPages > 1 && (
+                <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+              )}
+            </>
+          );
+        })()}
 
-        {activeTab === "following" && (
-          following.length === 0 ? (
+        {activeTab === "following" && (() => {
+          const PAGE_SIZE = 10;
+          const pageItems = following.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+          const totalPages = Math.ceil(following.length / PAGE_SIZE);
+          return following.length === 0 ? (
             <p className="text-stone-500 text-sm">Not following anyone yet.</p>
           ) : (
-            <div className="flex flex-col gap-2">
-              {following.map((u) => (
-                <UserRow
-                  key={u.id}
-                  user={u}
-                  action={isOwn ? (
-                    <button
-                      onClick={() => handleUnfollowFromList(u.handle)}
-                      className="text-xs text-stone-500 hover:text-red-400 transition-colors"
-                    >
-                      Unfollow
-                    </button>
-                  ) : undefined}
-                />
-              ))}
-            </div>
-          )
-        )}
+            <>
+              <div className="flex flex-col gap-2">
+                {pageItems.map((u) => (
+                  <UserRow
+                    key={u.id}
+                    user={u}
+                    action={isOwn ? (
+                      <button
+                        onClick={() => handleUnfollowFromList(u.handle)}
+                        className="text-xs text-stone-500 hover:text-red-400 transition-colors"
+                      >
+                        Unfollow
+                      </button>
+                    ) : undefined}
+                  />
+                ))}
+              </div>
+              {totalPages > 1 && (
+                <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+              )}
+            </>
+          );
+        })()}
       </section>
 
       {/* API token — own profile only, placed last as a developer/power-user feature */}
@@ -403,6 +421,99 @@ function Tile({ value, label, accent }: { value: number; label: string; accent?:
   );
 }
 
+function BoardDropdown({
+  boards,
+  value,
+  onChange,
+}: {
+  boards: Board[];
+  value: string;
+  onChange: (boardId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const selected = boards.find((b) => b.id === value);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 bg-stone-800 border border-stone-700 hover:border-stone-500 rounded-lg px-3 py-1.5 text-xs text-stone-300 transition-colors"
+      >
+        <span className="truncate max-w-40">{selected?.name ?? "Select board"}</span>
+        <svg
+          className={`w-3 h-3 text-stone-500 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.5"
+        >
+          <path d="M1 1l4 4 4-4" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1 bg-stone-800 border border-stone-700 rounded-lg shadow-2xl z-20 min-w-48 py-1">
+          {boards.map((b) => (
+            <label
+              key={b.id}
+              className="flex items-center gap-2.5 px-3 py-2 hover:bg-stone-700/60 cursor-pointer select-none"
+            >
+              <input
+                type="radio"
+                name="home-board"
+                checked={b.id === value}
+                onChange={() => { onChange(b.id); setOpen(false); }}
+                className="accent-orange-500 w-3.5 h-3.5"
+              />
+              <span className="text-sm text-stone-300">{b.name}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
+  return (
+    <div className="flex items-center justify-center gap-3 mt-5">
+      <button
+        onClick={() => onChange(page - 1)}
+        disabled={page === 1}
+        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm text-stone-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        aria-label="Previous page"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M10 3L5 8l5 5" />
+        </svg>
+        Prev
+      </button>
+      <span className="text-stone-500 text-sm">
+        {page} / {totalPages}
+      </span>
+      <button
+        onClick={() => onChange(page + 1)}
+        disabled={page === totalPages}
+        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm text-stone-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        aria-label="Next page"
+      >
+        Next
+        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M6 3l5 5-5 5" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 function UserRow({ user, action }: { user: User; action?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 bg-stone-800 border border-stone-700 rounded-xl px-4 py-3">
@@ -454,7 +565,7 @@ function TickCard({
               <span className="text-stone-400 text-xs">Working</span>
             )}
             <GradeBadge grade={tick.grade} />
-            <span className="text-white font-semibold text-sm truncate">{tick.climbName}</span>
+            <Link href={`/climbs/${tick.climbId}`} className="text-white font-semibold text-sm truncate hover:text-orange-400 transition-colors">{tick.climbName}</Link>
           </div>
           <div className="mt-1.5 flex items-center gap-3 flex-wrap">
             <StarRating value={Math.round(tick.rating)} size="sm" />
@@ -475,12 +586,6 @@ function TickCard({
           )}
         </div>
         <div className="flex items-center gap-3 shrink-0 mt-0.5">
-          <Link
-            href={`/climbs/${tick.climbId}`}
-            className="text-xs text-stone-500 hover:text-white transition-colors"
-          >
-            View
-          </Link>
           {canEdit && (
             <>
               <button

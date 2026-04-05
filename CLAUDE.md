@@ -592,6 +592,34 @@ export async function GET(
 - **Fonts:** Geist Sans + Geist Mono (loaded in `src/app/layout.tsx`)
 - **Images:** External images must be allowlisted in `next.config.ts` (currently `picsum.photos`)
 
+### Multi-select dropdown
+
+Whenever a multi-select control is needed, use the custom `BoardSelect`-style pattern from `src/app/stats/page.tsx` — **do not use a native `<select multiple>`**. The pattern:
+
+- A styled button showing the current selection label (`"All <things>"` when nothing selected, the single item name when one is chosen, `"N <things>"` when multiple are checked)
+- A chevron icon that rotates 180° when open
+- A dropdown panel (`bg-stone-800 border border-stone-700 rounded-lg shadow-2xl z-20`) that closes on outside click via a `mousedown` listener attached in a `useEffect`
+- An **"All …"** checkbox at the top that clears the selection, followed by a divider, then one labeled checkbox per option
+- Checkboxes use `accent-orange-500`
+- The component is self-contained (owns its `open` state, accepts `selected: string[]` + `onChange` props)
+
+---
+
+### Tick List Card
+
+The canonical UI element for displaying a user's tick in a list. Reference implementation: `TickCard` in `src/app/user/[handle]/page.tsx`.
+
+Structure (top-to-bottom, left-to-right):
+
+- **Container:** `bg-stone-800 border border-stone-700 rounded-xl p-4`
+- **Left column** (`flex-1 min-w-0`):
+  - **Row 1 — headline:** sent/working status badge + `<GradeBadge>` + climb name as a `<Link href="/climbs/[id]">` (white, `hover:text-orange-400`)
+    - Sent: `text-green-400 text-xs font-semibold` label `"Sent"`
+    - Working: `text-stone-400 text-xs` label `"Working"`
+  - **Row 2 — meta:** `<StarRating size="sm">` · board name & angle (`text-stone-500 text-xs`) · attempt count (`text-stone-500 text-xs`) · relative time via `timeAgo()` (`text-stone-600 text-xs`)
+  - **Row 3 — comment** (optional): `text-stone-400 text-sm leading-relaxed`
+- **Right column** (`shrink-0`, owner-only): `"Edit"` button (`hover:text-orange-400`) and `"Delete"` button (`hover:text-red-400`), both `text-xs text-stone-500`
+
 ---
 
 ## Deployment

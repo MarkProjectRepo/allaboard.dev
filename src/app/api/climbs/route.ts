@@ -67,7 +67,9 @@ export async function GET(req: NextRequest) {
     const gradeMax  = searchParams.get("gradeMax");
     const angleMin  = searchParams.get("angleMin");
     const angleMax  = searchParams.get("angleMax");
-    const boardId   = searchParams.get("boardId");
+    // Accept ?boardIds=uuid1,uuid2 (multi) or legacy ?boardId=uuid (single)
+    const boardIds  = searchParams.get("boardIds")?.split(",").filter(Boolean)
+                   ?? (searchParams.get("boardId") ? [searchParams.get("boardId")!] : []);
     const limit     = Math.min(Number(searchParams.get("limit") ?? 25), 100);
     const offset    = Math.max(Number(searchParams.get("offset") ?? 0), 0);
     const sort      = searchParams.get("sort") ?? "sends_desc";
@@ -108,8 +110,9 @@ export async function GET(req: NextRequest) {
       query.orderBy("climbs.sends", "desc").orderBy("climbs.name", "asc");
     }
 
-    if (q)      query.whereILike("climbs.name", `%${q}%`);
-    if (boardId) query.where("climbs.board_id", boardId);
+    if (q) query.whereILike("climbs.name", `%${q}%`);
+    if (boardIds.length === 1) query.where("climbs.board_id", boardIds[0]);
+    else if (boardIds.length > 1) query.whereIn("climbs.board_id", boardIds);
 
     if (gradeMin || gradeMax) {
       const minIdx = gradeMin ? ALL_GRADES.indexOf(gradeMin as never) : 0;
