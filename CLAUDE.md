@@ -64,6 +64,25 @@ Runs Next.js only (port 3000). API routes are served by Next.js at `/api/*`.
 
 ## Database
 
+### Denormalization policy
+
+**All denormalized columns must be maintained by a PostgreSQL trigger, never by application code.**
+
+Counters and aggregates that duplicate data already derivable from another table (e.g. `followers_count`, `following_count`, `sends`, `star_rating`) must be kept in sync via an `AFTER INSERT OR UPDATE OR DELETE` trigger on the source table. Application code must not increment, decrement, or recalculate these values — doing so risks drift whenever rows are inserted or deleted outside the normal API path (seeds, migrations, scripts, direct DB access).
+
+When adding a new denormalized column:
+1. Write a migration that creates the trigger function and attaches it to the source table.
+2. Include a resync statement in the migration (`UPDATE … SET col = (SELECT …)`) so existing rows start in a consistent state.
+3. Do **not** add application-code fallback logic — the trigger is the single source of truth.
+
+Existing triggers:
+| Trigger | Source table | Columns maintained |
+|---|---|---|
+| `follows_count_sync` | `follows` | `users.followers_count`, `users.following_count` |
+| `ticks_climb_stats_sync` | `ticks` | `climbs.sends`, `climbs.star_rating` |
+
+---
+
 **Engine:** PostgreSQL (local: `localhost:5432`, database `allaboard`)
 **ORM:** Knex with TypeScript migrations
 **Connection:** `DATABASE_URL` env var, or defaults to local postgres

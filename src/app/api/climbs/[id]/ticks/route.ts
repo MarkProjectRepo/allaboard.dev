@@ -79,8 +79,8 @@ export async function GET(
  * @param params - Route params. `id` is the climb UUID.
  *
  * @remarks
- * After inserting the tick, `climbs.star_rating` and `climbs.sends` are
- * recalculated atomically from the full tick set.
+ * `climbs.star_rating` and `climbs.sends` are kept in sync automatically
+ * by a database trigger on the ticks table.
  *
  * @returns The created tick object with status `201`.
  *
@@ -143,19 +143,6 @@ export async function POST(
       sent:            sent ?? true,
       created_at:      now,
       updated_at:      now,
-    });
-
-    // Recalculate aggregates on the climb
-    const [ratingResult] = await db("ticks")
-      .where({ climb_id: id })
-      .avg("rating as avg");
-    const [sendsResult] = await db("ticks")
-      .where({ climb_id: id, sent: true })
-      .count("id as count");
-
-    await db("climbs").where({ id }).update({
-      star_rating: ratingResult?.avg != null ? Number(Number(ratingResult.avg).toFixed(2)) : null,
-      sends:       Number(sendsResult?.count ?? 0),
     });
 
     const tick = await db("ticks").where({ id: tickId }).first();

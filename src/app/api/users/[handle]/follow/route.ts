@@ -46,9 +46,6 @@ export async function POST(
       .onConflict(["follower_id", "following_id"])
       .ignore();
 
-    await db("users").where({ id: target.id }).increment("followers_count", 1);
-    await db("users").where({ id: userId }).increment("following_count", 1);
-
     return NextResponse.json({ following: true });
   } catch (err) {
     console.error(err);
@@ -84,14 +81,9 @@ export async function DELETE(
     const target = await db("users").where({ handle }).first();
     if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const deleted = await db("follows")
+    await db("follows")
       .where({ follower_id: userId, following_id: target.id })
       .delete();
-
-    if (deleted > 0) {
-      await db("users").where({ id: target.id }).decrement("followers_count", 1);
-      await db("users").where({ id: userId }).decrement("following_count", 1);
-    }
 
     return NextResponse.json({ following: false });
   } catch (err) {

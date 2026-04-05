@@ -26,8 +26,8 @@ import { resolveUserId } from "@/lib/server/resolveUserId";
  * @param params - Route params. `id` is the tick UUID.
  *
  * @remarks
- * After updating, `climbs.star_rating` and `climbs.sends` are
- * recalculated from the full tick set.
+ * `climbs.star_rating` and `climbs.sends` are kept in sync automatically
+ * by a database trigger on the ticks table.
  *
  * @returns The updated tick row.
  *
@@ -88,15 +88,6 @@ export async function PATCH(
 
     await db("ticks").where({ id }).update(patch);
 
-    // Recalculate climb aggregates
-    const climbId = tick.climb_id as string;
-    const [ratingResult] = await db("ticks").where({ climb_id: climbId }).avg("rating as avg");
-    const [sendsResult]  = await db("ticks").where({ climb_id: climbId, sent: true }).count("id as count");
-    await db("climbs").where({ id: climbId }).update({
-      star_rating: ratingResult?.avg != null ? Number(Number(ratingResult.avg).toFixed(2)) : null,
-      sends:       Number(sendsResult?.count ?? 0),
-    });
-
     const updated = await db("ticks").where({ id }).first();
     return NextResponse.json(updated);
   } catch (err) {
@@ -115,8 +106,8 @@ export async function PATCH(
  * @param params - Route params. `id` is the tick UUID.
  *
  * @remarks
- * After deletion, `climbs.star_rating` and `climbs.sends` are
- * recalculated from the remaining ticks.
+ * `climbs.star_rating` and `climbs.sends` are kept in sync automatically
+ * by a database trigger on the ticks table.
  *
  * @returns `204 No Content` on success.
  *
@@ -143,17 +134,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const climbId = tick.climb_id as string;
     await db("ticks").where({ id }).delete();
-
-    // Recalculate climb aggregates
-    const [ratingResult] = await db("ticks").where({ climb_id: climbId }).avg("rating as avg");
-    const [sendsResult]  = await db("ticks").where({ climb_id: climbId, sent: true }).count("id as count");
-
-    await db("climbs").where({ id: climbId }).update({
-      star_rating: ratingResult?.avg != null ? Number(Number(ratingResult.avg).toFixed(2)) : null,
-      sends:       Number(sendsResult?.count ?? 0),
-    });
 
     return new NextResponse(null, { status: 204 });
   } catch (err) {

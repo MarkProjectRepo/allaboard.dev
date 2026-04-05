@@ -93,23 +93,15 @@ describe("POST /api/users/[handle]/follow", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns 200 with { following: true } and updates follower/following counts", async () => {
+  it("returns 200 with { following: true }", async () => {
     mockGetIronSession.mockResolvedValue(authSession("me") as never);
     mockDb
       .mockReturnValueOnce(qb(targetUser, targetUser))  // find target user
-      .mockReturnValueOnce(qb())                         // insert follow (onConflict.ignore)
-      .mockReturnValueOnce(qb())                         // increment target followers_count
-      .mockReturnValueOnce(qb());                        // increment caller following_count
+      .mockReturnValueOnce(qb());                        // insert follow (onConflict.ignore)
 
     const res = await POST(postReq("targetuser"), params("targetuser"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ following: true });
-
-    // Verify both increment calls were made
-    const incrementCalls = mockDb.mock.results
-      .map((r: { value: { increment: jest.Mock } }) => r.value.increment)
-      .filter((inc: jest.Mock) => inc.mock.calls.length > 0);
-    expect(incrementCalls).toHaveLength(2);
   });
 });
 
@@ -127,39 +119,26 @@ describe("DELETE /api/users/[handle]/follow", () => {
     expect((await DELETE(deleteReq("nobody"), params("nobody"))).status).toBe(404);
   });
 
-  it("returns 200 with { following: false } and decrements counts when a follow row existed", async () => {
+  it("returns 200 with { following: false }", async () => {
     mockGetIronSession.mockResolvedValue(authSession("me") as never);
-    // delete returns 1 (a row was actually removed)
-    const deleteQb = qb();
-    deleteQb.delete = jest.fn().mockResolvedValue(1);
-
     mockDb
       .mockReturnValueOnce(qb(targetUser, targetUser))  // find target user
-      .mockReturnValueOnce(deleteQb)                     // delete follow row
-      .mockReturnValueOnce(qb())                         // decrement target followers_count
-      .mockReturnValueOnce(qb());                        // decrement caller following_count
+      .mockReturnValueOnce(qb());                        // delete follow row
 
     const res = await DELETE(deleteReq("targetuser"), params("targetuser"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ following: false });
   });
 
-  it("does not decrement counts when no follow row existed", async () => {
+  it("returns 200 even when no follow row existed (no-op)", async () => {
     mockGetIronSession.mockResolvedValue(authSession("me") as never);
-    const deleteQb = qb();
-    deleteQb.delete = jest.fn().mockResolvedValue(0); // nothing deleted
-
     mockDb
-      .mockReturnValueOnce(qb(targetUser, targetUser))
-      .mockReturnValueOnce(deleteQb);
+      .mockReturnValueOnce(qb(targetUser, targetUser))  // find target user
+      .mockReturnValueOnce(qb());                        // delete follow row (0 affected — no-op)
 
     const res = await DELETE(deleteReq("targetuser"), params("targetuser"));
     expect(res.status).toBe(200);
-    // decrement should not have been called on any QB
-    const decrementCalls = mockDb.mock.results
-      .map((r: { value: { decrement: jest.Mock } }) => r.value.decrement)
-      .filter((dec: jest.Mock) => dec.mock.calls.length > 0);
-    expect(decrementCalls).toHaveLength(0);
+    expect(await res.json()).toEqual({ following: false });
   });
 });
 

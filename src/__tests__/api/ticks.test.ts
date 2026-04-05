@@ -47,14 +47,6 @@ function deleteReq(id: string) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Set up the four DB calls that follow a successful tick fetch (recalculate aggregates). */
-function mockAggregateRecalc() {
-  mockDb
-    .mockReturnValueOnce(qb([{ avg: 3.5 }]))             // avg("rating as avg")
-    .mockReturnValueOnce(qb([{ count: 5 }]))             // count("id as count")
-    .mockReturnValueOnce(qb());                          // climbs.update(star_rating, sends)
-}
-
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 beforeEach(() => jest.clearAllMocks());
@@ -92,9 +84,8 @@ describe("PATCH /api/ticks/[id] — access control", () => {
     const updated = { ...tickRow, rating: 4 };
     mockDb
       .mockReturnValueOnce(qb(tickRow, tickRow))     // fetch tick
-      .mockReturnValueOnce(qb());                    // update tick
-    mockAggregateRecalc();
-    mockDb.mockReturnValueOnce(qb(updated, updated)); // return updated tick
+      .mockReturnValueOnce(qb())                     // update tick
+      .mockReturnValueOnce(qb(updated, updated));    // return updated tick
 
     const res = await PATCH(patchReq("tick-1", { rating: 4 }), params("tick-1"));
     expect(res.status).toBe(200);
@@ -122,25 +113,13 @@ describe("DELETE /api/ticks/[id] — access control", () => {
     expect((await DELETE(deleteReq("tick-1"), params("tick-1"))).status).toBe(404);
   });
 
-  it("returns 204 and recalculates climb aggregates when the owner deletes", async () => {
+  it("returns 204 when the owner deletes", async () => {
     mockGetIronSession.mockResolvedValue(authSession("alice") as never);
     mockDb
       .mockReturnValueOnce(qb(tickRow, tickRow))  // fetch tick
       .mockReturnValueOnce(qb());                 // delete tick
-    mockAggregateRecalc();
 
     const res = await DELETE(deleteReq("tick-1"), params("tick-1"));
     expect(res.status).toBe(204);
-
-    // Verify aggregates were recalculated and written back to climbs
-    const updateCall = mockDb.mock.results
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((r: any) => r.value.update)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .find((u: any) => u.mock.calls.length > 0);
-    expect(updateCall).toBeDefined();
-    expect(updateCall).toHaveBeenCalledWith(
-      expect.objectContaining({ sends: expect.any(Number) }),
-    );
   });
 });
