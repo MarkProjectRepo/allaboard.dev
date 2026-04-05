@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { EChartsOption } from "echarts";
@@ -35,7 +35,14 @@ const GRADE_HEX: Record<string, string> = {
 };
 
 // Lightweight ECharts wrapper — initialises on mount, updates on option change, cleans up on unmount.
-function EChart({ option, height = 360 }: { option: EChartsOption; height?: number }) {
+// onReady fires once after init and again after every resize so callers can
+// reposition pixel-based graphics (e.g. Sunday marker lines).
+function EChart({ option, height = 360, onReady }: {
+  option: EChartsOption;
+  height?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onReady?: (chart: any) => void;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<import("echarts").ECharts | null>(null);
 
@@ -48,7 +55,11 @@ function EChart({ option, height = 360 }: { option: EChartsOption; height?: numb
       chart = echarts.init(containerRef.current);
       chartRef.current = chart;
       chart.setOption(option);
-      const ro = new ResizeObserver(() => chart.resize());
+      onReady?.(chart);
+      const ro = new ResizeObserver(() => {
+        chart.resize();
+        onReady?.(chart);
+      });
       ro.observe(containerRef.current!);
       (chart as any).__ro = ro;
     });
@@ -60,10 +71,14 @@ function EChart({ option, height = 360 }: { option: EChartsOption; height?: numb
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update when option changes
+  // Update when option changes, then re-fire onReady so callers can
+  // reposition pixel-based graphics for the new data range.
   useEffect(() => {
-    chartRef.current?.setOption(option, { notMerge: true });
-  }, [option]);
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.setOption(option, { notMerge: true });
+    onReady?.(chart);
+  }, [option, onReady]);
 
   return <div ref={containerRef} style={{ width: "100%", height }} />;
 }
@@ -107,24 +122,62 @@ function ticksToTooltipHtml(ticks: UserTick[]): string {
 
 // ─── Chart builders ───────────────────────────────────────────────────────────
 
-/** Returns every YYYY-MM-DD string from dateFrom to dateTo inclusive. */
+/** Format a Date as YYYY-MM-DD using the local timezone (not UTC). */
+function localDateStr(d: Date): string {
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+/**
+ * Return a tick's date as a YYYY-MM-DD local-timezone string.
+ * Date-only strings (length ≤ 10) are returned as-is to avoid UTC
+ * midnight mis-parsing; full ISO timestamps are converted via localDateStr.
+ */
+function tickLocalDate(date: string): string {
+  return date.length <= 10 ? date.slice(0, 10) : localDateStr(new Date(date));
+}
+
+function ordinalSuffix(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1: return `${n}st`;
+    case 2: return `${n}nd`;
+    case 3: return `${n}rd`;
+    default: return `${n}th`;
+  }
+}
+
+function sundayTooltipHtml(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  const month = d.toLocaleString("en-US", { month: "long" });
+  const label = `Sunday ${month} ${ordinalSuffix(d.getDate())}`;
+  return `<div style="background:#1c1917;border:1px solid #44403c;border-radius:8px;padding:6px 10px;font-size:12px;color:#e7e5e4">${label}</div>`;
+}
+
+/** Returns every YYYY-MM-DD string from dateFrom to dateTo inclusive (local timezone). */
 function allDatesInRange(dateFrom: string, dateTo: string): string[] {
   const dates: string[] = [];
   const cursor = new Date(dateFrom + "T00:00:00");
   const end    = new Date(dateTo   + "T00:00:00");
   while (cursor <= end) {
-    dates.push(cursor.toISOString().slice(0, 10));
+    dates.push(localDateStr(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }
   return dates;
 }
 
-function buildHeatmapOption(ticks: UserTick[], dateFrom: string, dateTo: string, isMobile = false): EChartsOption {
+function buildHeatmapOption(
+  ticks: UserTick[], dateFrom: string, dateTo: string, isMobile = false,
+): { option: EChartsOption; sundays: string[]; dates: string[] } {
   const countMap = new Map<string, number>();
   const ticksByCell = new Map<string, UserTick[]>();
   for (const tick of ticks) {
     if (!tick.sent) continue;
-    const key = `${tick.date.slice(0, 10)}|${tick.grade}`;
+    const key = `${tickLocalDate(tick.date)}|${tick.grade}`;
     countMap.set(key, (countMap.get(key) ?? 0) + 1);
     if (!ticksByCell.has(key)) ticksByCell.set(key, []);
     ticksByCell.get(key)!.push(tick);
@@ -133,29 +186,50 @@ function buildHeatmapOption(ticks: UserTick[], dateFrom: string, dateTo: string,
   const dates = allDatesInRange(dateFrom, dateTo);
   const grades = ALL_GRADES;
 
-  const raw: { di: number; gi: number; count: number }[] = [];
+  // One vertical rule per Sunday so week boundaries are visible.
+  const sundays = dates.filter((d) => new Date(d + "T00:00:00").getDay() === 0);
+
+  // Compute maxCount from ticked cells only (used for opacity scaling).
+  let maxCount = 1;
+  for (let di = 0; di < dates.length; di++)
+    for (let gi = 0; gi < grades.length; gi++) {
+      const c = countMap.get(`${dates[di]}|${grades[gi]}`) ?? 0;
+      if (c > maxCount) maxCount = c;
+    }
+
+  // Build every cell (background + ticked) in one pass.
+  // Background cells use alternating column colours keyed on di % 2 so they
+  // are part of the same series coordinate space as the tick cells — this is
+  // the only way to guarantee pixel-perfect alignment.
+  const data: { value: [number, number, number]; itemStyle: { color: string; opacity: number } }[] = [];
   for (let di = 0; di < dates.length; di++) {
+    const bgColor = di % 2 === 0 ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0)";
     for (let gi = 0; gi < grades.length; gi++) {
       const count = countMap.get(`${dates[di]}|${grades[gi]}`) ?? 0;
-      if (count > 0) raw.push({ di, gi, count });
+      if (count > 0) {
+        data.push({
+          value: [di, gi, count],
+          itemStyle: {
+            color: GRADE_HEX[grades[gi]],
+            opacity: 0.25 + (count / maxCount) * 0.75,
+          },
+        });
+      } else {
+        data.push({
+          value: [di, gi, 0],
+          itemStyle: { color: bgColor, opacity: 1 },
+        });
+      }
     }
   }
 
-  const maxCount = Math.max(...raw.map((d) => d.count), 1);
 
-  const data = raw.map(({ di, gi, count }) => ({
-    value: [di, gi, count] as [number, number, number],
-    itemStyle: {
-      color: GRADE_HEX[grades[gi]],
-      opacity: 0.25 + (count / maxCount) * 0.75,
-    },
-  }));
-
-  return {
+  const option: EChartsOption = {
     backgroundColor: "transparent",
     tooltip: {
       formatter: (params: any) => {
-        const [di, gi] = params.value as [number, number, number];
+        const [di, gi, count] = params.value as [number, number, number];
+        if (count === 0) return "";
         const key = `${dates[di]}|${grades[gi]}`;
         return ticksToTooltipHtml(ticksByCell.get(key) ?? []);
       },
@@ -194,6 +268,8 @@ function buildHeatmapOption(ticks: UserTick[], dateFrom: string, dateTo: string,
       },
     ],
   };
+
+  return { option, sundays, dates };
 }
 
 function buildPyramidOption(ticks: UserTick[]): EChartsOption {
@@ -292,14 +368,10 @@ function buildPyramidOption(ticks: UserTick[]): EChartsOption {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function toDateString(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
 function defaultDateFrom(months: number): string {
   const d = new Date();
   d.setMonth(d.getMonth() - months);
-  return toDateString(d);
+  return localDateStr(d);
 }
 
 interface ChartFilter {
@@ -309,7 +381,7 @@ interface ChartFilter {
 }
 
 function makeDefaultFilter(months: number): ChartFilter {
-  return { dateFrom: defaultDateFrom(months), dateTo: toDateString(new Date()), boards: [] };
+  return { dateFrom: defaultDateFrom(months), dateTo: localDateStr(new Date()), boards: [] };
 }
 
 /** True when called in a browser with a narrow viewport (Tailwind `sm` breakpoint). */
@@ -319,7 +391,7 @@ function isMobileScreen(): boolean {
 
 function applyFilter(ticks: UserTick[], filter: ChartFilter): UserTick[] {
   return ticks.filter((t) => {
-    const d = t.date.slice(0, 10);
+    const d = tickLocalDate(t.date);
     if (d < filter.dateFrom || d > filter.dateTo) return false;
     if (filter.boards.length > 0 && !filter.boards.includes(t.boardName)) return false;
     return true;
@@ -425,7 +497,7 @@ function ChartFilters({
         type="date"
         value={filter.dateTo}
         min={filter.dateFrom}
-        max={toDateString(new Date())}
+        max={localDateStr(new Date())}
         onChange={(e) => onChange({ ...filter, dateTo: e.target.value })}
         className="bg-stone-800 border border-stone-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-orange-500 transition-colors"
       />
@@ -442,23 +514,34 @@ function ChartFilters({
 
 // ─── Streak helper ────────────────────────────────────────────────────────────
 
-/** Returns the Sunday that starts the Sun–Sat week containing dateStr (YYYY-MM-DD). */
-function weekSunday(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() - d.getUTCDay()); // getUTCDay(): 0=Sun … 6=Sat
-  return d.toISOString().slice(0, 10);
+/**
+ * Returns the Monday (YYYY-MM-DD, local time) that starts the Mon–Sun week
+ * containing dateStr. Weeks run Monday–Sunday to match the chart's Sunday markers.
+ */
+function weekMonday(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  const day = d.getDay(); // 0=Sun, 1=Mon … 6=Sat
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return localDateStr(d);
 }
 
-/** Longest run of consecutive Sun–Sat weeks that each contained at least one tick. */
+/** Longest run of consecutive Mon–Sun weeks that each contained at least one sent tick. */
 function computeLongestStreak(ticks: UserTick[]): number {
-  const weeks = [...new Set(ticks.map((t) => weekSunday(t.date.slice(0, 10))))].sort();
+  const weeks = [
+    ...new Set(
+      ticks
+        .filter((t) => t.sent)
+        .map((t) => weekMonday(tickLocalDate(t.date))),
+    ),
+  ].sort();
   if (weeks.length === 0) return 0;
   let longest = 1;
   let current = 1;
   for (let i = 1; i < weeks.length; i++) {
-    const prev = new Date(weeks[i - 1] + "T00:00:00Z");
-    const curr = new Date(weeks[i]     + "T00:00:00Z");
-    const daysDiff = (curr.getTime() - prev.getTime()) / 86_400_000;
+    const prev = new Date(weeks[i - 1] + "T00:00:00");
+    const curr = new Date(weeks[i]     + "T00:00:00");
+    // Math.round guards against DST-induced ±1 hour edge cases
+    const daysDiff = Math.round((curr.getTime() - prev.getTime()) / 86_400_000);
     if (daysDiff === 7) {
       current++;
       if (current > longest) longest = current;
@@ -504,10 +587,62 @@ export default function UserStatsPage() {
   const heatmapTicks = useMemo(() => applyFilter(ticks, heatmapFilter), [ticks, heatmapFilter]);
   const pyramidTicks = useMemo(() => applyFilter(ticks, pyramidFilter), [ticks, pyramidFilter]);
 
-  const heatmapOption = useMemo(
+  const { option: heatmapOption, sundays: heatmapSundays, dates: heatmapDates } = useMemo(
     () => buildHeatmapOption(heatmapTicks, heatmapFilter.dateFrom, heatmapFilter.dateTo, isMobile),
     [heatmapTicks, heatmapFilter.dateFrom, heatmapFilter.dateTo, isMobile],
   );
+
+  // Refs so the onReady callback can always read the latest sundays/dates
+  // without being recreated every render.
+  const heatmapSundaysRef = useRef<string[]>([]);
+  const heatmapDatesRef   = useRef<string[]>([]);
+  heatmapSundaysRef.current = heatmapSundays;
+  heatmapDatesRef.current   = heatmapDates;
+
+  // useCallback so the function reference is stable — EChart's option-update
+  // effect depends on it and would otherwise re-run on every render.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const drawSundayLines = useCallback(function drawSundayLines(chart: any) {
+    const sundays = heatmapSundaysRef.current;
+    const dates   = heatmapDatesRef.current;
+    if (!sundays.length) return;
+
+    // Pixel centre of each category via the axis' own coordinate system —
+    // the midpoint of adjacent centres is the exact cell-boundary pixel.
+    const topY    = chart.convertToPixel({ yAxisIndex: 0 }, ALL_GRADES[ALL_GRADES.length - 1]) as number;
+    const bottomY = chart.convertToPixel({ yAxisIndex: 0 }, ALL_GRADES[0]) as number;
+    const cellH   = Math.abs(bottomY - topY) / (ALL_GRADES.length - 1);
+    const lineTop    = Math.round(topY    - cellH / 2);
+    const lineBottom = Math.round(bottomY + cellH / 2);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const graphics: any[] = sundays.flatMap((d, idx) => {
+      const si = dates.indexOf(d);
+      if (si < 0 || si + 1 >= dates.length) return [];
+      const sundayX = chart.convertToPixel({ xAxisIndex: 0 }, si)     as number;
+      const mondayX = chart.convertToPixel({ xAxisIndex: 0 }, si + 1) as number;
+      const x = Math.round((sundayX + mondayX) / 2);
+      return [{
+        type: "line",
+        id: `sunday-${idx}`,
+        shape: { x1: x, y1: lineTop, x2: x, y2: lineBottom },
+        style: { stroke: "#78716c", lineWidth: 1, lineDash: [3, 3], opacity: 0.6 },
+        silent: false,
+        z: 5,
+        tooltip: {
+          formatter: () => sundayTooltipHtml(d),
+          backgroundColor: "transparent",
+          borderColor: "transparent",
+          padding: 0,
+          extraCssText: "box-shadow:none",
+        },
+      }];
+    });
+
+    chart.setOption({ graphic: graphics });
+  // Refs are stable; no deps needed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const pyramidOption = useMemo(() => buildPyramidOption(pyramidTicks), [pyramidTicks]);
 
   const rowHeight    = isMobile ? 26 : 38;
@@ -553,7 +688,7 @@ export default function UserStatsPage() {
             <p className="text-stone-500 text-sm mb-3">More, more!</p>
             <ChartFilters allBoards={allBoards} filter={heatmapFilter} onChange={setHeatmapFilter} />
             <div className="bg-stone-900 border border-stone-700 rounded-xl p-5">
-              <EChart option={heatmapOption} height={heatmapHeight} />
+              <EChart option={heatmapOption} height={heatmapHeight} onReady={drawSundayLines} />
             </div>
           </section>
 

@@ -24,11 +24,14 @@ jest.mock("next/navigation", () => ({
 }));
 
 // ECharts uses dynamic import and a canvas API not available in jsdom — stub it.
+// convertToPixel is called by drawSundayLines after chart init; return 0 as a
+// safe no-op value so pixel arithmetic doesn't throw.
 jest.mock("echarts", () => ({
   init: jest.fn(() => ({
     setOption: jest.fn(),
     resize: jest.fn(),
     dispose: jest.fn(),
+    convertToPixel: jest.fn().mockReturnValue(0),
   })),
 }));
 
