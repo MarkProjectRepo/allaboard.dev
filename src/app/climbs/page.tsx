@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Grade, Board } from "@/lib/types";
 import { ALL_GRADES } from "@/lib/utils";
 import { getClimbs, ClimbFilters } from "@/lib/db";
@@ -18,11 +18,10 @@ export default function ClimbsPage() {
   const [boards, setBoards]       = useState<Board[]>([]);
   const [tickTarget, setTickTarget] = useState<{ id: string; name: string } | null>(null);
   const [loading, setLoading]     = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore]     = useState(false);
+  const [total, setTotal]         = useState(0);
+  const [page, setPage]           = useState(1);
   const [boardsLoaded, setBoardsLoaded] = useState(false);
-  const offsetRef = useRef(0);
-  const sentinelRef = useRef<HTMLDivElement>(null);
   const defaultApplied = useRef(false);
 
   // Filter state
@@ -62,8 +61,8 @@ export default function ClimbsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  function buildFilters(offset: number): ClimbFilters {
-    const f: ClimbFilters = { limit: PAGE_SIZE, offset };
+  function buildFilters(p: number): ClimbFilters {
+    const f: ClimbFilters = { limit: PAGE_SIZE, offset: (p - 1) * PAGE_SIZE };
     if (query)    f.q        = query;
     if (gradeMin) f.gradeMin = gradeMin;
     if (gradeMax) f.gradeMax = gradeMax;
@@ -74,48 +73,26 @@ export default function ClimbsPage() {
     return f;
   }
 
-  // Reset and reload when filters change — wait until boards (and default boardId) are set
+  // Reset to page 1 when any filter changes
+  useEffect(() => {
+    setPage(1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, gradeMin, gradeMax, boardIds, angleMin, angleMax, sort]);
+
+  // Fetch whenever filters or page change — wait until boards (and default boardId) are set
   useEffect(() => {
     if (!boardsLoaded) return;
     setLoading(true);
-    offsetRef.current = 0;
-    getClimbs(buildFilters(0))
-      .then(({ climbs, hasMore }) => {
+    getClimbs(buildFilters(page))
+      .then(({ climbs, hasMore, total }) => {
         setClimbs(climbs);
         setHasMore(hasMore);
-        offsetRef.current = climbs.length;
+        setTotal(total);
       })
-      .catch(() => { setClimbs([]); setHasMore(false); })
+      .catch(() => { setClimbs([]); setHasMore(false); setTotal(0); })
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, gradeMin, gradeMax, boardIds, angleMin, angleMax, sort, boardsLoaded]);
-
-  // Load next page
-  const loadMore = useCallback(() => {
-    if (loadingMore || !hasMore) return;
-    setLoadingMore(true);
-    getClimbs(buildFilters(offsetRef.current))
-      .then(({ climbs: next, hasMore: more }) => {
-        setClimbs((prev) => [...prev, ...next]);
-        setHasMore(more);
-        offsetRef.current += next.length;
-      })
-      .catch(() => {})
-      .finally(() => setLoadingMore(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadingMore, hasMore, query, gradeMin, gradeMax, boardIds, angleMin, angleMax, sort]);
-
-  // IntersectionObserver on sentinel
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) loadMore(); },
-      { rootMargin: "200px" },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [loadMore]);
+  }, [query, gradeMin, gradeMax, boardIds, angleMin, angleMax, sort, boardsLoaded, page]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -193,7 +170,7 @@ export default function ClimbsPage() {
         <div>
           <h1 className="text-3xl font-bold text-white">Climbs</h1>
           <p className="text-stone-400 mt-1">
-            {loading ? "Loading…" : `${climbs.length} climb${climbs.length !== 1 ? "s" : ""}`}
+            {loading ? "Loading…" : `${total} climb${total !== 1 ? "s" : ""}`}
           </p>
         </div>
         {user && (
@@ -459,13 +436,32 @@ export default function ClimbsPage() {
               />
             ))}
           </div>
-          {/* Sentinel — triggers loadMore when scrolled into view */}
-          <div ref={sentinelRef} className="h-4" />
-          {loadingMore && (
-            <div className="text-center py-6 text-stone-500 text-sm">Loading more…</div>
-          )}
-          {!hasMore && climbs.length >= PAGE_SIZE && (
-            <div className="text-center py-6 text-stone-600 text-sm">All climbs loaded</div>
+          {(page > 1 || hasMore) && (
+            <div className="flex items-center justify-center gap-3 mt-6">
+              <button
+                onClick={() => setPage((p) => p - 1)}
+                disabled={page === 1}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm text-stone-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                aria-label="Previous page"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M10 3L5 8l5 5" />
+                </svg>
+                Prev
+              </button>
+              <span className="text-stone-500 text-sm">{page}</span>
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!hasMore}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm text-stone-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                aria-label="Next page"
+              >
+                Next
+                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M6 3l5 5-5 5" />
+                </svg>
+              </button>
+            </div>
           )}
         </>
       )}

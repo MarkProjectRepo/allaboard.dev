@@ -74,9 +74,28 @@ export async function GET(req: NextRequest) {
     const offset    = Math.max(Number(searchParams.get("offset") ?? 0), 0);
     const sort      = searchParams.get("sort") ?? "sends_desc";
 
+    // Helper: apply the WHERE clauses shared by both the data query and the count query.
+    function applyFilters<T extends object>(q_: typeof db): T {
+      const builder = q_ as unknown as ReturnType<typeof db>;
+      if (q) builder.whereILike("climbs.name", `%${q}%`);
+      if (boardIds.length === 1) builder.where("climbs.board_id", boardIds[0]);
+      else if (boardIds.length > 1) builder.whereIn("climbs.board_id", boardIds);
+
+      if (gradeMin || gradeMax) {
+        const minIdx = gradeMin ? ALL_GRADES.indexOf(gradeMin as never) : 0;
+        const maxIdx = gradeMax ? ALL_GRADES.indexOf(gradeMax as never) : minIdx;
+        const range  = ALL_GRADES.slice(Math.max(0, minIdx), Math.min(ALL_GRADES.length, maxIdx + 1));
+        if (range.length > 0) builder.whereIn("climbs.grade", range);
+      }
+
+      if (angleMin) builder.where("climbs.angle", ">=", Number(angleMin));
+      if (angleMax) builder.where("climbs.angle", "<=", Number(angleMax));
+      return builder as unknown as T;
+    }
+
     const needsVideoJoin = sort === "has_video";
 
-    const query = db("climbs")
+    const dataQuery = db("climbs")
       .select(
         "climbs.*",
         "boards.name as board_name",
@@ -87,7 +106,7 @@ export async function GET(req: NextRequest) {
       .offset(offset);
 
     if (needsVideoJoin) {
-      query.leftJoin(
+      dataQuery.leftJoin(
         db("ticks").whereNotNull("instagram_url").distinct("climb_id").as("vid"),
         "climbs.id",
         "vid.climb_id",
@@ -96,39 +115,29 @@ export async function GET(req: NextRequest) {
 
     // Apply sort order
     if (sort === "star_rating_desc") {
-      query.orderByRaw("climbs.star_rating DESC NULLS LAST").orderBy("climbs.name", "asc");
+      dataQuery.orderByRaw("climbs.star_rating DESC NULLS LAST").orderBy("climbs.name", "asc");
     } else if (sort === "grade_desc") {
       const caseExpr = ALL_GRADES.map((g, i) => `WHEN '${g}' THEN ${i}`).join(" ");
-      query.orderByRaw(`CASE climbs.grade ${caseExpr} ELSE 999 END DESC`).orderBy("climbs.name", "asc");
+      dataQuery.orderByRaw(`CASE climbs.grade ${caseExpr} ELSE 999 END DESC`).orderBy("climbs.name", "asc");
     } else if (sort === "grade_asc") {
       const caseExpr = ALL_GRADES.map((g, i) => `WHEN '${g}' THEN ${i}`).join(" ");
-      query.orderByRaw(`CASE climbs.grade ${caseExpr} ELSE 999 END ASC`).orderBy("climbs.name", "asc");
+      dataQuery.orderByRaw(`CASE climbs.grade ${caseExpr} ELSE 999 END ASC`).orderBy("climbs.name", "asc");
     } else if (sort === "has_video") {
-      query.orderByRaw("(vid.climb_id IS NOT NULL) DESC").orderBy("climbs.sends", "desc").orderBy("climbs.name", "asc");
+      dataQuery.orderByRaw("(vid.climb_id IS NOT NULL) DESC").orderBy("climbs.sends", "desc").orderBy("climbs.name", "asc");
     } else {
       // sends_desc (default)
-      query.orderBy("climbs.sends", "desc").orderBy("climbs.name", "asc");
+      dataQuery.orderBy("climbs.sends", "desc").orderBy("climbs.name", "asc");
     }
 
-    if (q) query.whereILike("climbs.name", `%${q}%`);
-    if (boardIds.length === 1) query.where("climbs.board_id", boardIds[0]);
-    else if (boardIds.length > 1) query.whereIn("climbs.board_id", boardIds);
+    applyFilters(dataQuery as unknown as typeof db);
 
-    if (gradeMin || gradeMax) {
-      const minIdx = gradeMin ? ALL_GRADES.indexOf(gradeMin as never) : 0;
-      // If no gradeMax, treat it as a single-grade filter (same as min)
-      const maxIdx = gradeMax ? ALL_GRADES.indexOf(gradeMax as never) : minIdx;
-      const range  = ALL_GRADES.slice(
-        Math.max(0, minIdx),
-        Math.min(ALL_GRADES.length, maxIdx + 1),
-      );
-      if (range.length > 0) query.whereIn("climbs.grade", range);
-    }
+    const countQuery = db("climbs")
+      .leftJoin("boards", "climbs.board_id", "boards.id")
+      .count("climbs.id as total");
+    applyFilters(countQuery as unknown as typeof db);
 
-    if (angleMin) query.where("climbs.angle", ">=", Number(angleMin));
-    if (angleMax) query.where("climbs.angle", "<=", Number(angleMax));
-
-    const rows    = await query;
+    const [rows, [{ total: totalRaw }]] = await Promise.all([dataQuery, countQuery]);
+    const total   = Number(totalRaw ?? 0);
     const hasMore = rows.length > limit;
     if (hasMore) rows.pop();
 
@@ -148,7 +157,7 @@ export async function GET(req: NextRequest) {
       byClimb[v.climb_id as string].push(v);
     }
 
-    return NextResponse.json({ climbs: rows.map((r) => toClimb(r, byClimb[r.id] ?? [])), hasMore });
+    return NextResponse.json({ climbs: rows.map((r) => toClimb(r, byClimb[r.id] ?? [])), hasMore, total });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Failed to fetch climbs" }, { status: 500 });

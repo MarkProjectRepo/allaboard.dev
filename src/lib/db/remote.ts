@@ -35,7 +35,7 @@ export interface ClimbFilters {
   offset?: number;
 }
 
-export async function getClimbs(filters?: ClimbFilters): Promise<{ climbs: Climb[]; hasMore: boolean }> {
+export async function getClimbs(filters?: ClimbFilters): Promise<{ climbs: Climb[]; hasMore: boolean; total: number }> {
   const params = new URLSearchParams();
   if (filters?.q)                        params.set("q",        filters.q);
   if (filters?.gradeMin)                 params.set("gradeMin", filters.gradeMin);
@@ -47,7 +47,7 @@ export async function getClimbs(filters?: ClimbFilters): Promise<{ climbs: Climb
   if (filters?.limit  != null)           params.set("limit",    String(filters.limit));
   if (filters?.offset != null)           params.set("offset",   String(filters.offset));
   const qs = params.toString();
-  return api<{ climbs: Climb[]; hasMore: boolean }>(`/climbs${qs ? `?${qs}` : ""}`);
+  return api<{ climbs: Climb[]; hasMore: boolean; total: number }>(`/climbs${qs ? `?${qs}` : ""}`);
 }
 
 export async function getClimbById(id: string): Promise<Climb | undefined> {
