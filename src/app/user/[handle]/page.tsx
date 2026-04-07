@@ -372,6 +372,9 @@ export default function UserProfilePage() {
         <AuroraImportSection handle={profileUser.handle} onSuccess={reload} />
       )}
 
+      {/* Moonboard export — own profile only */}
+      {isOwn && <MoonboardExportSection />}
+
       {/* API token — own profile only, placed last as a developer/power-user feature */}
       {isOwn && profileUser.apiToken && (
         <section className="mt-8 pb-8">
@@ -740,6 +743,116 @@ function AuroraImportSection({
         {error && (
           <p className="text-red-400 text-sm">{error}</p>
         )}
+      </div>
+    </section>
+  );
+}
+
+// ─── Moonboard export ─────────────────────────────────────────────────────────
+
+const MOONBOARD_OPTIONS = [
+  { label: "Moonboard 2016 @ 40 degrees", filter: "setupId~eq~'1'~and~Configuration~eq~3" },
+] as const;
+
+function MoonboardExportSection() {
+  const [selectedFilter, setSelectedFilter] = useState<string>(MOONBOARD_OPTIONS[0].filter);
+  const [copied, setCopied] = useState(false);
+
+  const snippet = `const filter = "${selectedFilter}";
+
+// Step 1: fetch the list of sessions.
+const logbook = await fetch("https://www.moonboard.com/Logbook/GetLogbook", {
+  method: "POST",
+  headers: {
+    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "x-requested-with": "XMLHttpRequest",
+  },
+  body: \`sort=&page=1&pageSize=4000&group=&filter=\${encodeURIComponent(filter)}\`,
+  credentials: "include",
+}).then(r => r.json());
+
+// Step 2: fetch the climbs for each session, 3 at a time.
+const ids = (logbook.Data ?? []).map(entry => entry.Id);
+const entries = [];
+for (let i = 0; i < ids.length; i += 3) {
+  const batch = ids.slice(i, i + 3).map(id =>
+    fetch(\`https://www.moonboard.com/Logbook/GetLogbookEntries/\${id}\`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "x-requested-with": "XMLHttpRequest",
+      },
+      body: \`sort=&page=1&pageSize=30&group=&filter=\${encodeURIComponent(filter)}\`,
+      credentials: "include",
+    }).then(r => r.json()).then(data => ({ id, data }))
+  );
+  entries.push(...await Promise.all(batch));
+  console.log(\`Fetched \${Math.min(i + 3, ids.length)} / \${ids.length} sessions\`);
+}
+
+// Step 3: download as JSON.
+const blob = new Blob([JSON.stringify({ logbook, entries }, null, 2)], { type: "application/json" });
+const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "my-climbs.json" });
+a.click();`
+
+  function copySnippet() {
+    void navigator.clipboard.writeText(snippet);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <section className="mt-8 pb-2">
+      <h2 className="text-orange-400 font-semibold text-lg mb-3">Export Moonboard Data</h2>
+      <div className="bg-stone-800 border border-stone-700 rounded-xl p-4 space-y-4">
+        <p className="text-stone-400 text-xs leading-relaxed">
+          Export your Moonboard benchmarks as JSON so you can import them into Allaboard.
+        </p>
+
+        {/* Board selector */}
+        <div>
+          <label className="text-stone-300 text-sm font-medium block mb-1.5">Board</label>
+          <select
+            value={selectedFilter}
+            onChange={(e) => setSelectedFilter(e.target.value)}
+            className="bg-stone-900 border border-stone-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 transition-colors"
+          >
+            {MOONBOARD_OPTIONS.map((opt) => (
+              <option key={opt.filter} value={opt.filter}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Instructions */}
+        <ol className="space-y-1.5 text-stone-400 text-sm list-decimal list-inside">
+          <li>
+            Visit{" "}
+            <a
+              href="https://www.moonboard.com/account/login"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-orange-400 hover:text-orange-300 underline"
+            >
+              moonboard.com/account/login
+            </a>{" "}
+            and log in to your account.
+          </li>
+          <li>Copy the snippet below after selecting your board type.</li>
+          <li>On moonboard.com, right-click anywhere on the page and choose <strong>Inspect</strong>. Click the <strong>Console</strong> tab at the top of the panel that opens. Paste the script into the input at the bottom and press Enter.</li>
+        </ol>
+
+        {/* Snippet */}
+        <div className="relative">
+          <pre className="bg-stone-900 border border-stone-700 rounded-lg p-4 text-xs text-stone-300 font-mono overflow-x-auto whitespace-pre leading-relaxed">
+            {snippet}
+          </pre>
+          <button
+            onClick={copySnippet}
+            className="absolute top-3 right-3 px-3 py-1.5 bg-stone-700 hover:bg-stone-600 text-stone-300 text-xs rounded-lg transition-colors"
+          >
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        </div>
       </div>
     </section>
   );
