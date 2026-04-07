@@ -838,6 +838,12 @@ function MoonboardImportSection({
                 <dt className="text-stone-400">Climbs created</dt>
                 <dd className="text-white font-semibold">{result.climbsCreated}</dd>
               </div>
+              {result.boardsCreated > 0 && (
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-stone-400">Boards created</dt>
+                  <dd className="text-white font-semibold">{result.boardsCreated}</dd>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-4">
                 <dt className="text-stone-400">Ticks skipped</dt>
                 <dd className="text-stone-500">{result.skipped}</dd>
@@ -860,6 +866,12 @@ function MoonboardImportSection({
                     <div className="flex items-center justify-between gap-4 pl-3">
                       <dt className="text-stone-500 text-xs">Missing climb name</dt>
                       <dd className="text-stone-500 text-xs">{result.skipDetails.missingName}</dd>
+                    </div>
+                  )}
+                  {result.skipDetails.notSent > 0 && (
+                    <div className="flex items-center justify-between gap-4 pl-3">
+                      <dt className="text-stone-500 text-xs">Projects (not sent)</dt>
+                      <dd className="text-stone-500 text-xs">{result.skipDetails.notSent}</dd>
                     </div>
                   )}
                 </div>

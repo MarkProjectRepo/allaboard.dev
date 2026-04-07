@@ -25,6 +25,13 @@ interface MoonboardConfiguration {
   [key: string]: unknown;
 }
 
+interface MoonboardHoldsetup {
+  Id?: number;
+  /** e.g. "MoonBoard 2016" — maps to a board row by name */
+  Description?: string;
+  [key: string]: unknown;
+}
+
 interface MoonboardProblem {
   Name?: string;
   /** Official Font-scale grade (e.g. "7B+") */
@@ -33,6 +40,8 @@ interface MoonboardProblem {
   UserGrade?: string;
   Setter?: MoonboardSetter;
   MoonBoardConfiguration?: MoonboardConfiguration;
+  /** Hold set / board generation — used to resolve the board row */
+  Holdsetup?: MoonboardHoldsetup;
   /** User's personal star rating for this problem (Moonboard scale) */
   UserRating?: number;
   [key: string]: unknown;
@@ -112,6 +121,7 @@ function parseMoonboardDate(raw: unknown): Date | null {
  *   with an `entries` array. Each entry's `data.Data` array contains climb records:
  *   - `Problem.Name` *(required)* — climb name.
  *   - `Problem.Grade` *(required)* — Font-scale grade string (e.g. `"7B+"`).
+ *   - `Problem.Holdsetup.Description` *(optional)* — board name (e.g. `"MoonBoard 2016"`); looked up or created dynamically.
  *   - `Problem.Setter.Nickname` *(optional)* — setter display name stored on new climbs.
  *   - `Problem.UserRating` *(optional)* — user's star rating; mapped to 1–4 internally.
  *   - `Attempts` *(optional)* — number of attempts for this session.
@@ -125,23 +135,27 @@ function parseMoonboardDate(raw: unknown): Date | null {
  * Grades use the Font scale and are converted to V-scale on import.
  * Entries whose grade cannot be converted are skipped.
  *
- * Climbs are looked up by `(name, angle, grade, board_id)` against the
- * "Moonboard 2016" board. The angle is read from each problem's
- * `MoonBoardConfiguration.Description` (e.g. "40° MoonBoard" → 40); falls back
- * to 40 if absent. If no matching climb exists, a new one is
- * created attributed to the importing user. If a tick for the same
- * `(climb_id, user_id)` pair already exists on the same calendar day it is
+ * The board is resolved per-record from `Problem.Holdsetup.Description` with a
+ * case-insensitive name match against existing boards. If no matching board exists
+ * it is created on the fly. All boards are fetched once upfront and cached for the
+ * duration of the request.
+ *
+ * The angle is read from each problem's `MoonBoardConfiguration.Description`
+ * (e.g. "40° MoonBoard" → 40); falls back to 40 if absent.
+ *
+ * Climbs are looked up by `(name, angle, grade, board_id)`. If no matching climb
+ * exists a new one is created attributed to the importing user. If a tick for the
+ * same `(climb_id, user_id)` pair already exists on the same calendar day it is
  * skipped so re-running the same export is idempotent.
  *
  * @returns
  * ```json
- * { "imported": 5, "climbsCreated": 2, "skipped": 1 }
+ * { "imported": 5, "climbsCreated": 2, "boardsCreated": 0, "skipped": 1 }
  * ```
  *
  * @returns `400` if the body is missing, not valid JSON, or has no `entries` array.
  * @returns `401` if not authenticated.
  * @returns `403` if authenticated as a different user than `handle`.
- * @returns `404` if the Moonboard 2016 board is not found.
  * @returns `500` on database error.
  */
 export async function POST(
@@ -167,15 +181,15 @@ export async function POST(
     return NextResponse.json({ error: "Body must contain an 'entries' array" }, { status: 400 });
   }
 
-  const moonboard = await db("boards").where({ name: "Moonboard 2016" }).first();
-  if (!moonboard) {
-    return NextResponse.json({ error: "Moonboard 2016 board not found" }, { status: 404 });
-  }
-
-  const boardId = moonboard.id as string;
+  // Load all existing boards once; cache by lowercase name → id so lookups are O(1).
+  const existingBoards = await db("boards").select("id", "name") as { id: string; name: string }[];
+  const boardCache = new Map<string, string>(
+    existingBoards.map((b) => [b.name.toLowerCase(), b.id]),
+  );
 
   let imported = 0;
   let climbsCreated = 0;
+  let boardsCreated = 0;
   const skipDetails = {
     missingName: 0,
     unknownGrade: 0,
@@ -188,11 +202,10 @@ export async function POST(
     if (!Array.isArray(climbRecords)) continue;
 
     for (const record of climbRecords) {
-      // "Project" means attempted but not sent.
-      const sent = record.NumberOfTries !== "Project";
-      // Skip unsent logging
-      if (!sent) { skipDetails.notSent++; continue; }
 
+      const sent = record.NumberOfTries !== "Project";
+      if (!sent) { skipDetails.notSent++; continue; }
+      
       const climbName = record.Problem?.Name?.trim();
       if (!climbName) { skipDetails.missingName++; continue; }
 
@@ -201,8 +214,26 @@ export async function POST(
       const vGrade = fontToVGrade(rawGrade);
       if (!vGrade) { skipDetails.unknownGrade++; continue; }
 
+      // Resolve board by name from Problem.Holdsetup.Description; create if absent.
+      const holdsetupName =
+        typeof record.Problem?.Holdsetup?.Description === "string" &&
+        record.Problem.Holdsetup.Description.trim()
+          ? record.Problem.Holdsetup.Description.trim()
+          : "Moonboard 2016";
+      const boardKey = holdsetupName.toLowerCase();
+      let boardId = boardCache.get(boardKey);
+      if (!boardId) {
+        const newBoardId = uuidv4();
+        await db("boards").insert({ id: newBoardId, name: holdsetupName, created_at: new Date() });
+        boardCache.set(boardKey, newBoardId);
+        boardId = newBoardId;
+        boardsCreated++;
+      }
+
       // Angle comes from the problem's configuration description; default to 40.
       const angle = parseAngle(record.Problem?.MoonBoardConfiguration?.Description) ?? 40;
+
+      // "Project" means attempted but not sent — skip those entirely.
 
       // DateClimbed is a Microsoft JSON date ("/Date(ms)/"). Fall back to the
       // human-readable DateClimbedAsString, then to now.
@@ -274,5 +305,5 @@ export async function POST(
   }
 
   const skipped = Object.values(skipDetails).reduce((a, b) => a + b, 0);
-  return NextResponse.json({ imported, climbsCreated, skipped, skipDetails }, { status: 200 });
+  return NextResponse.json({ imported, climbsCreated, boardsCreated, skipped, skipDetails }, { status: 200 });
 }

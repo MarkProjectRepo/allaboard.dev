@@ -242,11 +242,13 @@ export async function importAuroraData(
 export interface MoonboardImportResult {
   imported: number;
   climbsCreated: number;
+  boardsCreated: number;
   skipped: number;
   skipDetails: {
     missingName: number;
     unknownGrade: number;
     alreadyImported: number;
+    notSent: number;
   };
 }
 

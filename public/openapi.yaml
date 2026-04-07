@@ -815,15 +815,13 @@ paths:
             type: string
       responses:
         "200":
-          description: "``json { \"imported\": 5, \"climbsCreated\": 2, \"skipped\": 1 } ``"
+          description: "``json { \"imported\": 5, \"climbsCreated\": 2, \"boardsCreated\": 0, \"skipped\": 1 } ``"
         "400":
           description: the body is missing, not valid JSON, or has no entries array.
         "401":
           description: not authenticated.
         "403":
           description: authenticated as a different user than handle.
-        "404":
-          description: the Moonboard 2016 board is not found.
         "500":
           description: database error.
       requestBody:
@@ -842,6 +840,9 @@ paths:
                 Problem.Grade:
                   type: string
                   description: Font-scale grade string (e.g. "7B+").
+                Problem.Holdsetup.Description:
+                  type: string
+                  description: board name (e.g. "MoonBoard 2016"); looked up or created dynamically.
                 Problem.Setter.Nickname:
                   type: string
                   description: setter display name stored on new climbs.
